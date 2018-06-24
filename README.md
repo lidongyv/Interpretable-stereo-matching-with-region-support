@@ -30,16 +30,22 @@ groud truth:
 object segmentation
 network:
 detection and 2-class classification
+multi-class classification
+multi two-class classification
+mask rcnn for object detection
 P3:
 groud truth:
 resegment the P2 with depth
 segment with the P1 and P3
 network:
+re-segmentation from P2
 P4:
 groud truth:
 pair of pixels with direction
 from P1 and P3
 network:
+the pixels among each P3 to show the direction of the variance
+classification
 
 
 
