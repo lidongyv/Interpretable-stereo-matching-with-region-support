@@ -17,6 +17,32 @@ P4:
 variance direction
 gradient detection
 
+MTPCN:
+P1:
+groud truth:
+edges on the disparity map, discriminative and representative depth edges
+inside the objects, colorful edges
+sample between the edges
+network:
+pixel-wise classification
+P2:
+groud truth:
+object segmentation
+network:
+detection and 2-class classification
+P3:
+groud truth:
+resegment the P2 with depth
+segment with the P1 and P3
+network:
+P4:
+groud truth:
+pair of pixels with direction
+from P1 and P3
+network:
+
+
+
 Stereo Matching:
 feature extraction:
 network1: receiptive field r7, five k3 conv
