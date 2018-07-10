@@ -2,17 +2,14 @@
 # @Author: yulidong
 # @Date:   2018-03-19 13:33:07
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-04-07 15:14:04
+# @Last Modified time: 2018-07-06 16:51:51
 
 import os
 import torch
 import numpy as np
-import scipy.misc as m
-import cv2
 from torch.utils import data
-from python_pfm import *
 from rsden.utils import recursive_glob
-
+import torchvision.transforms as transforms
 
 class SceneFlow(data.Dataset):
 
@@ -25,80 +22,52 @@ class SceneFlow(data.Dataset):
         :param is_transform:
         :param img_size:
         """
-        self.root = root
-        self.split = split
         self.is_transform = is_transform
         self.n_classes = 9  # 0 is reserved for "other"
         self.img_size = img_size if isinstance(img_size, tuple) else (540, 960)
         self.mean = np.array([104.00699, 116.66877, 122.67892])
+        self.stats={'mean': [0.485, 0.456, 0.406],
+                   'std': [0.229, 0.224, 0.225]}
         self.files = {}
-
-        self.li = os.path.join(self.root,self.split,'li')
-        self.ld = os.path.join(self.root,self.split,'ld')
-        self.lr = os.path.join(self.root,self.split,'lr')
-
-        self.files['li'] = recursive_glob(rootdir=self.li, suffix='.png')
-        self.files['ld'] = recursive_glob(rootdir=self.ld, suffix='.pfm')
-        self.files['lr'] = recursive_glob(rootdir=self.lr, suffix='.png')
-        if not self.files['ld']:
+        self.datapath='/home/lidong/Documents/datasets/Driving/train_data_clean_pass/'
+        self.files=os.listdir(self.datapath)
+        self.files.sort()
+        self.task='generation'
+        if len(self.files)<1:
             raise Exception("No files for ld=[%s] found in %s" % (split, self.ld))
 
-        print("Found %d %s images" % (len(self.files['ld']), split))
+        print("Found %d in %s data" % (len(self.files), self.datapat))
 
     def __len__(self):
         """__len__"""
-        return len(self.files['ld'])
+        return len(self.files)
 
     def __getitem__(self, index):
         """__getitem__
 
         :param index:
         """
-        img_path = self.files['li'][index].rstrip()
-        disparity_path = self.files['ld'][index].rstrip()
-        region_path=self.files['lr'][index].rstrip()
-        img = cv2.imread(img_path)
-        img = np.array(img, dtype=np.uint8)
-        #dis=readPFM(disparity_path)
-        #dis=np.array(dis[0], dtype=np.uint8)
-        region = cv2.imread(region_path)
-        region = np.array(region, dtype=np.uint8)
-
+        data=np.load(os.path.join(self.datapath,self.files[index]))
+        data=data[:540,:960,:]
+        left=data[0:3]
+        right=data[3:6]
+        disparity=data[6]
+        P=data[7:]
         if self.is_transform:
-            img, region = self.transform(img, region)
-
-        return img, region
-
-    def transform(self, img, region):
+            img, region = self.transform(left, right,disparity,P)
+        if self.task=='generation':
+            return left, right,disparity,P
+        else:
+            return left, right,disparity,P
+    def transform(self, left, right):
         """transform
-
-        :param img:
-        :param region:
         """
-        img = img[:, :,:]
-        img = img.astype(np.float64)
-        # Resize scales images from 0 to 255, thus we need
-        # to divide by 255.0
-        img = img.astype(float) / 255.0
-        # NHWC -> NCHW
-        img = img.transpose(2, 0, 1)
-
-        region=region[:,:,0]
-        region = region.astype(float)/32
-        region = np.round(region)
-        #region = m.imresize(region, (self.img_size[0], self.img_size[1]), 'nearest', mode='F')
-        region = region.astype(int)
-        region=np.reshape(region,[1,region.shape[0],region.shape[1]])
-        classes = np.unique(region)
-        #print(classes)
-        #region = region.transpose(2,0,1)
-        if not np.all(classes == np.unique(region)):
-            print("WARN: resizing labels yielded fewer classes")
-
-        if not np.all(classes < self.n_classes):
-            raise ValueError("Segmentation map contained invalid class values")
-
-        img = torch.from_numpy(img).float()
-        region = torch.from_numpy(region).long()
-
-        return img, region
+        trans=transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(**self.stats),
+        ])
+        left=trans(left)
+        right=trans(right)
+        disparity=torch.from_numpy(disparity).float()
+        P=torch.from_numpy(P).float()
+        return left,right,disparity,P
