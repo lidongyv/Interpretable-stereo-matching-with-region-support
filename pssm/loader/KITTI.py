@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-04-25 23:06:40
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-05-12 13:57:56
+# @Last Modified time: 2018-05-12 11:05:56
 
 
 import os
@@ -71,13 +71,6 @@ class KITTI(data.Dataset):
         # Resize scales images from 0 to 255, thus we need
         # to divide by 255.0
         #img = torch.from_numpy(img).float()
-        crop_size=np.array(np.where(depth>0))
-        x_min=np.min(crop_size[0,:])
-        x_max=np.max(crop_size[0,:])
-        y_min=np.min(crop_size[1,:])
-        y_max=np.max(crop_size[1,:])
-        depth=depth[x_min:x_max,y_min:y_max]
-        img=img[x_min:x_max,y_min:y_max,:]        
         depth = torch.from_numpy(depth).float()/256
 
         #img = img.astype(float) / 255.0
