@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-12 14:08:41
+# @Last Modified time: 2018-07-16 16:59:23
 
 import torch
 import numpy as np
@@ -177,49 +177,61 @@ class aggregation_sparse(nn.Module):
                                        nn.ReLU(inplace=True),
                                        convbn(32, 32, 3, 1, 1, 1),
                                        nn.ReLU(inplace=True),
+                                       convbn(32, 32, 3, 1, 1, 1),
+                                       nn.ReLU(inplace=True))
+        self.layer1 = self._make_layer(BasicBlock, 32, 3, 1,1,1)
+
+        self.l_conv2 = nn.Sequential(convbn(33, 32, 3, 1, 1, 1),
+                                       nn.ReLU(inplace=True),
                                        convbn(32, 1, 3, 1, 1, 1))
-
-
-
     def forward(self, s,l,x):
-        s_var      = self.s_conv(torch.cat([s,x]))+x
-        l_var      = self.l_conv(torch.cat([l,x]))+x
+        s_var = self.s_conv(torch.cat([s,x]))+x
+        l_var = self.l_conv(torch.cat([l,x]))
+        l_var = self.layer1(l_var)
+        l_var = self.l_conv2(l_var)+x
         return s_var,l_var
 class aggregation_dense(nn.Module):
     def __init__(self):
         super(aggregation, self).__init__()
-        self.conv = nn.Sequential(convbn(65, 32, 3, 1, 1, 1),
+        self.inplanes = 32
+        self.firstconv = nn.Sequential(convbn(65, 32, 3, 1, 1, 1),
                                        nn.ReLU(inplace=True),
                                        convbn(32, 32, 3, 1, 1, 1),
                                        nn.ReLU(inplace=True),
                                        convbn(32, 32, 3, 1, 1, 1)
                                        )
         self.layer1 = self._make_layer(BasicBlock, 32, 3, 1,1,1)
-
-
-        self.branch1 = nn.Sequential(nn.AvgPool2d((64, 64), stride=(64,64)),
-                                     convbn(32, 32, 1, 1, 0, 1),
-                                     nn.ReLU(inplace=True))
-
-        self.branch2 = nn.Sequential(nn.AvgPool2d((32, 32), stride=(32,32)),
-                                     convbn(32, 32, 1, 1, 0, 1),
-                                     nn.ReLU(inplace=True))
-
-        self.branch3 = nn.Sequential(nn.AvgPool2d((16, 16), stride=(16,16)),
-                                     convbn(32, 32, 1, 1, 0, 1),
-                                     nn.ReLU(inplace=True))
-
-        self.branch4 = nn.Sequential(nn.AvgPool2d((8, 8), stride=(8,8)),
-                                     convbn(32, 32, 1, 1, 0, 1),
-                                     nn.ReLU(inplace=True))
-
-        self.lastconv = nn.Sequential(convbn(32, 32, 3, 1, 1, 1),
+        self.layer2 = self._make_layer(BasicBlock, 64, 16, 1,1,1) 
+        self.layer3 = self._make_layer(BasicBlock, 128, 3, 1,1,1)
+        self.layer4 = self._make_layer(BasicBlock, 128, 3, 1,1,2)
+        self.lastconv = nn.Sequential(convbn(128, 32, 3, 1, 1, 1),
                                       nn.ReLU(inplace=True),
                                       nn.Conv2d(32, 1, kernel_size=1, padding=0, stride = 1, bias=False))
 
+    def _make_layer(self, block, planes, blocks, stride, pad, dilation):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+           downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion),)
 
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample, pad, dilation))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes,1,None,pad,dilation))
+
+        return nn.Sequential(*layers)
     def forward(self, s,l,x):
-        dense      = self.conv(torch.cat([s,x]))
+
+        output = self.firstconv(torch.cat([s,l,x]))
+        output = self.layer1(output)
+        output = self.layer2(output)
+        output = self.layer3(output)
+        output = self.layer4(output)
+        dense = self.lastconv(output_feature)
+        dense = torch.where(x>0,x,dense)
         return dense
 class ss_argmin(nn.Module):
     def __init__(self):
@@ -229,9 +241,23 @@ class ss_argmin(nn.Module):
 
 
     def forward(self,x,min,max):
+        one=torch.ones(1)
+        zero=torch.zeros(1)
         x=self.softmax(x)
         index=torch.ones_like(x)*torch.range(min,max+1)
-        return torch.sum(x*index,dim=-1)
+        disparity= torch.sum(x*index,dim=-1)
+        v,i=torch.topk(x,k=1,dim=-1)
+        mask_1=torch.where(v>0.7,one,zero)
+        v,i=torch.topk(x,k=5,dim=-1)
+        v_sum=torch.sum(v,-1)
+        mask_2=torch.where(v_s>0.7,one,zero)
+        i_dis=torch.max(i,-1)[0]-torch.min(i,-1)[0]
+        mask_3=torch.where(i_dis<6,one,zero)
+        mask=mask_1+mask_2*mask_3
+        mask=torch.where(mask>0,one,zero)
+        return disparity*mask
+
+
 
 class EDSNet(nn.Module):
 
@@ -302,7 +328,7 @@ class EDSNet(nn.Module):
                 for m in range(planes.shape[-1])
                     s_var,l_var=self.aggregation_sparse(l_sf,l_lf,plane[...,m])
                     plane[...,m]=s_var*s_mask+l_var*l_mask
-                    plane[...,m]=self.aggregation_dense(plane[...,m])
+                    plane[...,m]=self.aggregation_dense(l_sf,l_lf,plane[...,m])
                 a_volume+=plane
             cost_volume[i]=a_volume
         #disparity
