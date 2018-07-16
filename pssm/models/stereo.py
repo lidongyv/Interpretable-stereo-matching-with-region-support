@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-11 11:11:39
+# @Last Modified time: 2018-07-12 14:08:41
 
 import torch
 import numpy as np
@@ -164,7 +164,7 @@ class feature_extraction2(nn.Module):
 
         return output
 
-class aggregation(nn.Module):
+class aggregation_sparse(nn.Module):
     def __init__(self):
         super(aggregation, self).__init__()
         self.s_conv = nn.Sequential(convbn(33, 32, 3, 1, 1, 1),
@@ -185,7 +185,42 @@ class aggregation(nn.Module):
         s_var      = self.s_conv(torch.cat([s,x]))+x
         l_var      = self.l_conv(torch.cat([l,x]))+x
         return s_var,l_var
+class aggregation_dense(nn.Module):
+    def __init__(self):
+        super(aggregation, self).__init__()
+        self.conv = nn.Sequential(convbn(65, 32, 3, 1, 1, 1),
+                                       nn.ReLU(inplace=True),
+                                       convbn(32, 32, 3, 1, 1, 1),
+                                       nn.ReLU(inplace=True),
+                                       convbn(32, 32, 3, 1, 1, 1)
+                                       )
+        self.layer1 = self._make_layer(BasicBlock, 32, 3, 1,1,1)
 
+
+        self.branch1 = nn.Sequential(nn.AvgPool2d((64, 64), stride=(64,64)),
+                                     convbn(32, 32, 1, 1, 0, 1),
+                                     nn.ReLU(inplace=True))
+
+        self.branch2 = nn.Sequential(nn.AvgPool2d((32, 32), stride=(32,32)),
+                                     convbn(32, 32, 1, 1, 0, 1),
+                                     nn.ReLU(inplace=True))
+
+        self.branch3 = nn.Sequential(nn.AvgPool2d((16, 16), stride=(16,16)),
+                                     convbn(32, 32, 1, 1, 0, 1),
+                                     nn.ReLU(inplace=True))
+
+        self.branch4 = nn.Sequential(nn.AvgPool2d((8, 8), stride=(8,8)),
+                                     convbn(32, 32, 1, 1, 0, 1),
+                                     nn.ReLU(inplace=True))
+
+        self.lastconv = nn.Sequential(convbn(32, 32, 3, 1, 1, 1),
+                                      nn.ReLU(inplace=True),
+                                      nn.Conv2d(32, 1, kernel_size=1, padding=0, stride = 1, bias=False))
+
+
+    def forward(self, s,l,x):
+        dense      = self.conv(torch.cat([s,x]))
+        return dense
 class ss_argmin(nn.Module):
     def __init__(self):
         super(ss_argmin, self).__init__()
@@ -212,7 +247,8 @@ class EDSNet(nn.Module):
         super(EDSNet, self).__init__()
         self.feature_extraction=feature_extraction()
         self.feature_extraction2=feature_extraction2()
-        self.aggregation=aggregation()    
+        self.aggregation_sparse=aggregation_sparse()
+        self.aggregation_dense=aggregation_dense()   
         self.ss_argmin=ss_argmin()
         self.P=P
         #0 l to r,1 min,2 max
@@ -264,15 +300,21 @@ class EDSNet(nn.Module):
                 plane_mask=torch.where(object_r==j,one,zero)
                 plane=cost_volume[i]*plane_mask
                 for m in range(planes.shape[-1])
-                    s_var,l_var=self.aggregation(l_sf,l_lf,plane[...,m])
+                    s_var,l_var=self.aggregation_sparse(l_sf,l_lf,plane[...,m])
                     plane[...,m]=s_var*s_mask+l_var*l_mask
+                    plane[...,m]=self.aggregation_dense(plane[...,m])
                 a_volume+=plane
             cost_volume[i]=a_volume
+        #disparity
         for i in range(torch.max(self.P[:,:,1]).type(torch.int32)+1):
             min_d=torch.where(P[:,:,1]==i,self.pre[:,:,1],-1)
             max_d=torch.where(P[:,:,1]==i,self.pre[:,:,2],-1)
             disparity+=ss_argmin(cost_volume[i],min_d,max_d)
-        
+        for i in range(torch.max(self.P[:,:,1]).type(torch.int32)+1):
+            disparity_r=torch.where(P[:,:,1]==i,disparity,zero)
+
+
+            
 
         return x
 
