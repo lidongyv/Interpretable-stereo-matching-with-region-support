@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-16 16:59:23
+# @Last Modified time: 2018-07-16 22:16:14
 
 import torch
 import numpy as np
@@ -26,7 +26,8 @@ rsn_specs = {
 
 def convbn(in_planes, out_planes, kernel_size, stride, pad, dilation):
 
-    return nn.Sequential(nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=dilation if dilation > 1 else pad, dilation = dilation, bias=False),
+    return nn.Sequential(nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=dilation
+                         if dilation > 1 else pad, dilation = dilation, bias=False),
                          nn.BatchNorm2d(out_planes))
 class BasicBlock(nn.Module):
     expansion = 1
@@ -201,10 +202,9 @@ class aggregation_dense(nn.Module):
                                        convbn(32, 32, 3, 1, 1, 1)
                                        )
         self.layer1 = self._make_layer(BasicBlock, 32, 3, 1,1,1)
-        self.layer2 = self._make_layer(BasicBlock, 64, 16, 1,1,1) 
-        self.layer3 = self._make_layer(BasicBlock, 128, 3, 1,1,1)
+        self.layer3 = self._make_layer(BasicBlock, 64, 3, 1,1,1)
         self.layer4 = self._make_layer(BasicBlock, 128, 3, 1,1,2)
-        self.lastconv = nn.Sequential(convbn(128, 32, 3, 1, 1, 1),
+        self.lastconv = nn.Sequential(convbn(128, 64, 3, 1, 1, 1),
                                       nn.ReLU(inplace=True),
                                       nn.Conv2d(32, 1, kernel_size=1, padding=0, stride = 1, bias=False))
 
@@ -227,7 +227,6 @@ class aggregation_dense(nn.Module):
 
         output = self.firstconv(torch.cat([s,l,x]))
         output = self.layer1(output)
-        output = self.layer2(output)
         output = self.layer3(output)
         output = self.layer4(output)
         dense = self.lastconv(output_feature)
@@ -276,9 +275,13 @@ class EDSNet(nn.Module):
         self.aggregation_sparse=aggregation_sparse()
         self.aggregation_dense=aggregation_dense()   
         self.ss_argmin=ss_argmin()
+        # self.refinement_sparse=aggregation_sparse()
+        # self.refinement_dense=aggregation_dense()        
         self.P=P
         #0 l to r,1 min,2 max
-        self.pre=pre                                                                                
+        self.pre=pre
+    def crop(self,x):
+        index=(x==1).nonzero()
     def forward(self, l,r):
         l_mask=P[:,:,3]-P[:,:,0]
         s_mask=P[:,:,0]
@@ -331,17 +334,30 @@ class EDSNet(nn.Module):
                     plane[...,m]=self.aggregation_dense(l_sf,l_lf,plane[...,m])
                 a_volume+=plane
             cost_volume[i]=a_volume
-        #disparity
+        #ss_argmin
         for i in range(torch.max(self.P[:,:,1]).type(torch.int32)+1):
             min_d=torch.where(P[:,:,1]==i,self.pre[:,:,1],-1)
             max_d=torch.where(P[:,:,1]==i,self.pre[:,:,2],-1)
             disparity+=ss_argmin(cost_volume[i],min_d,max_d)
+        #refinement
+        refine=torch.zeros([540,960])
         for i in range(torch.max(self.P[:,:,1]).type(torch.int32)+1):
-            disparity_r=torch.where(P[:,:,1]==i,disparity,zero)
+            #disparity_r=torch.where(P[:,:,1]==i,disparity,zero)
+            object_r=torch.where(P[:,:,1]==i,self.P[:,:,2],zero)
+            max_r=torch.max(object_r)
+            object_r=torch.where(P[:,:,1]==i,self.P[:,:,2],max_r+1)
+            min_r=torch.min(object_r)
+            for j in range(min_r,max_r+1):
+                plane_mask=torch.where(object_r==j,one,zero)
+                plane=disparity*plane_mask
+                plane=self.aggregation_dense(l_sf,l_lf,plane)*plane_mask
+                refine+=plane
+
+
 
 
             
 
-        return x
+        return refine
 
 
