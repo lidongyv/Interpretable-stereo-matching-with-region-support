@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-06-20 14:37:27
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-03 17:32:28
+# @Last Modified time: 2018-07-07 19:10:16
 import cupy as cp
 import cv2
 import numpy as np
@@ -70,47 +70,47 @@ pathr=[
 pathr.sort()
 pathd=[
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_forwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_forwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_forwards/fast/left',
+        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_forwards/fast/right',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_backwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_backwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_backwards/fast/left',
+        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_backwards/fast/right',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_forwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_forwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_forwards/fast/left',
+        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_forwards/fast/right',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_backwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_backwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_backwards/fast/left'      
+        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_backwards/fast/right'      
       ]
 pathd.sort()
 paths=[
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_forwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_forwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_forwards/fast/left',
+        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_forwards/fast/right',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_backwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_backwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_backwards/fast/left',
+        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_backwards/fast/right',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_forwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_forwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_forwards/fast/left',
+        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_forwards/fast/right',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_backwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_backwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_backwards/fast/left'      
+        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_backwards/fast/right'      
       ]
 paths.sort()
 p_left_image=[]
 p_right_image=[]
 p_disparity=[]
 p_semantic=[]
-output_dir=r'/home/lidong/Documents/datasets/Driving/train_data/'
+output_dir=r'/home/lidong/Documents/datasets/Driving/train_data_final_pass/right/'
 path=pathd
 for p in range(len(path)):
     file=os.listdir(path[p])
