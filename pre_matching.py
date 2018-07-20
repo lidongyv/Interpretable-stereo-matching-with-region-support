@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-20 20:58:23
+# @Last Modified time: 2018-07-20 20:59:43
 import numpy as np
 import os
 import time
@@ -123,8 +123,8 @@ if __name__ == '__main__':
     #启动线程
     for i in range(thread_num):
         threads[i].start() 
-　　for i in range(thread_num):
-　　    threads[i].join()
+    for i in range(thread_num):
+        threads[i].join()
 
     #主线程
     print 'end:%s' %ctime()
