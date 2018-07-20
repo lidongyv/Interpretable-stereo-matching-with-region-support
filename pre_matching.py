@@ -2,13 +2,13 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-20 20:59:43
+# @Last Modified time: 2018-07-20 21:18:18
 import numpy as np
 import os
 import time
 import matplotlib.pyplot as plt
 import threading 
-thread_num=12
+thread_num=24
 def crop(object):
     ground=np.array((object==1).nonzero())
     x1=np.min(ground[0,:])
@@ -32,7 +32,6 @@ def pre_matching(length,index):
     for i in range(s_index,e_index):
         left=np.load(os.path.join(left_dir,left_files[i]))[...,8]
         right=np.load(os.path.join(right_dir,right_files[i]))[...,8]
-        print(i)
         pre=[]
         pre2=[]
         l_box=[]
@@ -96,7 +95,7 @@ def pre_matching(length,index):
         pre2.append(np.array([min_d,max_d]))
         pre_match=np.array([pre,pre2])
         np.save(os.path.join(match_dir,left_files[i]),pre_match)
-        print(time.time()-start)
+        print('thread:%d,doing:%d,time:%d' % (index,i,time.time()-start))
     # object=0
     # fig, ax = plt.subplots(nrows=1,ncols=2, sharex=True, sharey=True,figsize=(16, 32))
     # ax[0].imshow(np.where(left==object,1,0), cmap=plt.cm.gray)
@@ -111,20 +110,29 @@ class MyThread(threading.Thread):
     
     def run(self):
         apply(self.func,self.args)
+class myThread (threading.Thread):
+    def __init__(self, threadID, name, length,index):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+        self.length = length
+        self.index  = index
+    def run(self):
+        print ("start" + self.name)
+        pre_matching(self.length,self.index)
+        print ("done" + self.name)
 threads = []
 left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
 left_files=os.listdir(left_dir)
 length=len(left_files)
+threadID=1
 for i in range(thread_num):
-    t = MyThread(pre_matching,(length,i),str(i))
-    threads.append(t)        
+    thread = myThread(threadID, str(i), length,i)
+    thread.start()
+    threads.append(thread)
+    threadID += 1       
 
-if __name__ == '__main__': 
-    #启动线程
-    for i in range(thread_num):
-        threads[i].start() 
-    for i in range(thread_num):
-        threads[i].join()
+for t in threads:
+    t.join()
+print('end')
 
-    #主线程
-    print 'end:%s' %ctime()
