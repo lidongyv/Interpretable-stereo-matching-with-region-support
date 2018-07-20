@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-03-19 13:33:07
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-06 16:51:51
+# @Last Modified time: 2018-07-20 16:56:15
 
 import os
 import torch
@@ -28,37 +28,39 @@ class SceneFlow(data.Dataset):
         self.mean = np.array([104.00699, 116.66877, 122.67892])
         self.stats={'mean': [0.485, 0.456, 0.406],
                    'std': [0.229, 0.224, 0.225]}
-        self.files = {}
+        self.left_files = {}
         self.datapath='/home/lidong/Documents/datasets/Driving/train_data_clean_pass/'
-        self.files=os.listdir(self.datapath)
-        self.files.sort()
+        self.left_files=os.listdir(os.path.join(self.datapath,'left'))
+        self.match_files=os.listdir(os.path.join(self.datapath,'match'))
+        self.left_files.sort()
         self.task='generation'
-        if len(self.files)<1:
+        if len(self.left_files)<1:
             raise Exception("No files for ld=[%s] found in %s" % (split, self.ld))
 
-        print("Found %d in %s data" % (len(self.files), self.datapat))
+        print("Found %d in %s data" % (len(self.left_files), self.datapat))
 
     def __len__(self):
         """__len__"""
-        return len(self.files)
+        return len(self.left_files)
 
     def __getitem__(self, index):
         """__getitem__
 
         :param index:
         """
-        data=np.load(os.path.join(self.datapath,self.files[index]))
+        data=np.load(os.path.join(self.datapath,'left',self.left_files[index]))
         data=data[:540,:960,:]
         left=data[0:3]
         right=data[3:6]
         disparity=data[6]
         P=data[7:]
+        pre_match=np.load(os.path.join(self.datapath,'match',self.left_files[index]))
         if self.is_transform:
             img, region = self.transform(left, right,disparity,P)
         if self.task=='generation':
-            return left, right,disparity,P
+            return left, right,disparity,P,pre_match
         else:
-            return left, right,disparity,P
+            return left, right,disparity,P,pre_match
     def transform(self, left, right):
         """transform
         """

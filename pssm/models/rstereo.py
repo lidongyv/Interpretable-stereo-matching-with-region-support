@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-17 21:38:54
+# @Last Modified time: 2018-07-20 20:15:39
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -284,6 +284,7 @@ class EDSNet(nn.Module):
         # self.refinement_dense=aggregation_dense()        
         self.P=P
         #0 l to r,1 min,2 max
+        #[l_box,r_box,match],[min_d,max_d]
         self.pre=pre
         self.pre2=pre2
     def crop(self,x):
@@ -312,23 +313,32 @@ class EDSNet(nn.Module):
             min_d=self.pre2[i][0]
             max_d=self.pre2[i][1]
             object_mask=torch.where(P[:,:,1]==i,one,zero)
-            x1,y1,x2,y2=crop(object_mask)
+            #x1,y1,x2,y2=crop(object_mask)
+            x1,y1,x2,y2,size=self.pre[0,0][0]
             object_mask=object_mask[x1:x2,y1:y2]
             s_mask_o=object_mask*s_mask[x1:x2,y1:y2]
             l_mask_o=object_mask*l_mask[x1:x2,y1:y2]
             s_l_o=feature[...,x1:x2,y1:y2]*s_mask_o
             l_l_o=feature[...,x1:x2,y1:y2]*l_mask_o
-            s_r_o=r_sf[...,x1:x2,y1+min_d:torch.min(y2+max_d,r_lf.shape[-1])]
-            l_r_o=r_lf[...,x1:x2,y1+min_d:torch.min(y2+max_d,r_lf.shape[-1])]
+            s_r_o=r_sf[...,x1:x2,min_d:torch.min(max_d,r_lf.shape[-1])]
+            l_r_o=r_lf[...,x1:x2,min_d:torch.min(max_d,r_lf.shape[-1])]
             cost_s=[]
             cost_l=[]
-            for i in range(torch.min(y2+max_d,r_lf.shape[-1])-(y1+min_d)):
-                s_r_o_t=s_r_o[...,i:y2-y1+i]
+            for i in range(min_d,max_d):
+              if y1-i>0:
+                s_r_o_t=s_r_o[...,y1-i:y2-i]
+                cost_s.append(torch.where(s_mask_o==1,cosine_s(s_l_o,s_r_o_t),zero))
+              else:
+                s_r_o_t=torch.cat([torch.zeros_like(s_r_o[...,:i]),s_r_o[...,0:y2-i]],-1)
                 cost_s.append(torch.where(s_mask_o==1,cosine_s(s_l_o,s_r_o_t),zero))
             cost_s=torch.stack(cost_s,-1)
-            for i in range(torch.min(y2+max_d,r_lf.shape[-1])-(y1+min_d)):
-                l_r_o_t=l_r_o[...,i:y2-y1+i]
+            for i in range(min_d,max_d):
+              if y1-i>0:
+                l_r_o_t=l_r_o[...,y1-i:y2-i]
                 cost_l.append(torch.where(l_mask_o==1,cosine_s(l_l_o,l_r_o_t),zero))
+              else:
+                l_r_o_t=torch.cat([torch.zeros_like(l_r_o[...,:i]),l_r_o[...,0:y2-i]],-1)
+                cost_l.append(torch.where(l_mask_o==1,cosine_s(l_l_o,l_r_o_t),zero))                
             cost_l=torch.stack(cost_l,-1)
             cost_volume=cost_s+cost_l
             #aggregation
@@ -340,6 +350,7 @@ class EDSNet(nn.Module):
             for j in range(min_r,max_r+1):
                 plane_mask=torch.where(object_r==j,one,zero)[x1:x2,y1:y2]
                 xp1,xp2,yp1,yp2=crop(plane_mask)
+                #xp1,xp2,yp1,yp2.r_size=self.pre[0,0][1]
                 plane_mask=plane_mask[xp1:xp2,yp1:yp2]
                 plane=cost_volume[...,xp1:xp2,yp1:yp2,:]
                 for m in range(planes.shape[-1])
