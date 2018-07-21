@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-21 12:33:56
+# @Last Modified time: 2018-07-21 12:35:05
 import numpy as np
 import os
 import time
@@ -111,7 +111,7 @@ for i in range(thread_num):
     start.append(i*length/10)
     end.append((i+1)*length/10)
 for i in range(thread_num):
-    p=Process(target=pre_matching,args=(start,end))
+    p=Process(target=pre_matching,args=(start[i],end[i]))
     p.start()
     process.append(p)      
 for p in process:
