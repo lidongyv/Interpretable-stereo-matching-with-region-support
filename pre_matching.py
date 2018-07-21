@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-21 10:43:10
+# @Last Modified time: 2018-07-21 10:45:55
 import numpy as np
 import os
 import time
@@ -98,31 +98,8 @@ def pre_matching(length,index):
         pre_match=np.array([pre,pre2])
         np.save(os.path.join(match_dir,left_files[i]),pre_match)
         print('thread:%d,doing:%d,time:%2.f' % (index,i,time.time()-start))
-    # object=0
-    # fig, ax = plt.subplots(nrows=1,ncols=2, sharex=True, sharey=True,figsize=(16, 32))
-    # ax[0].imshow(np.where(left==object,1,0), cmap=plt.cm.gray)
-    # ax[1].imshow(np.where(right==match[object],1,0), cmap=plt.cm.gray)
-class MyThread(threading.Thread):
 
-    def __init__(self,func,args,name=''):
-        threading.Thread.__init__(self)
-        self.name=name
-        self.func=func
-        self.args=args
-    
-    def run(self):
-        apply(self.func,self.args)
-class myThread (threading.Thread):
-    def __init__(self, threadID, name, length,index):
-        threading.Thread.__init__(self)
-        self.threadID = threadID
-        self.name = name
-        self.length = length
-        self.index  = index
-    def run(self):
-        print ("start" + self.name)
-        pre_matching(self.length,self.index)
-        print ("done" + self.name)
+
 process = []
 left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
 left_files=os.listdir(left_dir)
