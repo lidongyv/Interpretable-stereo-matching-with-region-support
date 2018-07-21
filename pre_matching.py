@@ -2,13 +2,13 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-21 10:45:55
+# @Last Modified time: 2018-07-21 10:48:05
 import numpy as np
 import os
 import time
 import matplotlib.pyplot as plt
 from multiprocessing import Process,Lock
-thread_num=24
+thread_num=12
 def crop(object):
     ground=np.array((object==1).nonzero())
     x1=np.min(ground[0,:])
@@ -97,7 +97,7 @@ def pre_matching(length,index):
         pre2.append(np.array([min_d,max_d]))
         pre_match=np.array([pre,pre2])
         np.save(os.path.join(match_dir,left_files[i]),pre_match)
-        print('thread:%d,doing:%d,time:%2.f' % (index,i,time.time()-start))
+        print('thread:%d,doing:%d,time:%.3f' % (index,i,time.time()-start))
 
 
 process = []
@@ -105,7 +105,7 @@ left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
 left_files=os.listdir(left_dir)
 length=len(left_files)
 for i in range(thread_num):
-    p=Process(target=pre_matching(),args=(length,i))
+    p=Process(target=pre_matching,args=(length,i))
     p.start()
     process.append(p)      
 for p in process:
