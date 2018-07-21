@@ -2,13 +2,13 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-21 10:48:05
+# @Last Modified time: 2018-07-21 12:33:56
 import numpy as np
 import os
 import time
 import matplotlib.pyplot as plt
 from multiprocessing import Process,Lock
-thread_num=12
+thread_num=10
 def crop(object):
     ground=np.array((object==1).nonzero())
     x1=np.min(ground[0,:])
@@ -17,7 +17,7 @@ def crop(object):
     y2=np.max(ground[1,:])
     size=np.sum(object)
     return x1,y1,x2+1,y2+1,size
-def pre_matching(length,index):
+def pre_matching(start,end):
     left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
     right_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/right/'
     match_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/match/'
@@ -25,13 +25,13 @@ def pre_matching(length,index):
     left_files.sort()
     right_files=os.listdir(right_dir)
     right_files.sort()
-    s_index=int(np.floor(length/thread_num*index))-2
-    e_index=int(np.floor(length/thread_num*(index+1)))+2
-    if e_index>length:
-        e_index=length
-    if s_index<0:
-        s_index=0
-    for i in range(s_index,e_index):
+    # s_index=int(np.floor(length/thread_num*index))-2
+    # e_index=int(np.floor(length/thread_num*(index+1)))+2
+    # if e_index>length:
+    #     e_index=length
+    # if s_index<0:
+    #     s_index=0
+    for i in range(int(start),int(end)):
         left=np.load(os.path.join(left_dir,left_files[i]))[...,8]
         right=np.load(os.path.join(right_dir,right_files[i]))[...,8]
         pre=[]
@@ -103,9 +103,15 @@ def pre_matching(length,index):
 process = []
 left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
 left_files=os.listdir(left_dir)
+left_files.sort()
 length=len(left_files)
+start=[]
+end=[]
 for i in range(thread_num):
-    p=Process(target=pre_matching,args=(length,i))
+    start.append(i*length/10)
+    end.append((i+1)*length/10)
+for i in range(thread_num):
+    p=Process(target=pre_matching,args=(start,end))
     p.start()
     process.append(p)      
 for p in process:
