@@ -2,12 +2,12 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-20 21:18:18
+# @Last Modified time: 2018-07-21 10:43:10
 import numpy as np
 import os
 import time
 import matplotlib.pyplot as plt
-import threading 
+from multiprocessing import Process,Lock
 thread_num=24
 def crop(object):
     ground=np.array((object==1).nonzero())
@@ -25,10 +25,12 @@ def pre_matching(length,index):
     left_files.sort()
     right_files=os.listdir(right_dir)
     right_files.sort()
-    s_index=int(np.floor(length/thread_num*index))
-    e_index=int(np.floor(length/thread_num*(index+1)))+1
+    s_index=int(np.floor(length/thread_num*index))-2
+    e_index=int(np.floor(length/thread_num*(index+1)))+2
     if e_index>length:
         e_index=length
+    if s_index<0:
+        s_index=0
     for i in range(s_index,e_index):
         left=np.load(os.path.join(left_dir,left_files[i]))[...,8]
         right=np.load(os.path.join(right_dir,right_files[i]))[...,8]
@@ -95,7 +97,7 @@ def pre_matching(length,index):
         pre2.append(np.array([min_d,max_d]))
         pre_match=np.array([pre,pre2])
         np.save(os.path.join(match_dir,left_files[i]),pre_match)
-        print('thread:%d,doing:%d,time:%d' % (index,i,time.time()-start))
+        print('thread:%d,doing:%d,time:%2.f' % (index,i,time.time()-start))
     # object=0
     # fig, ax = plt.subplots(nrows=1,ncols=2, sharex=True, sharey=True,figsize=(16, 32))
     # ax[0].imshow(np.where(left==object,1,0), cmap=plt.cm.gray)
@@ -121,18 +123,15 @@ class myThread (threading.Thread):
         print ("start" + self.name)
         pre_matching(self.length,self.index)
         print ("done" + self.name)
-threads = []
+process = []
 left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
 left_files=os.listdir(left_dir)
 length=len(left_files)
-threadID=1
 for i in range(thread_num):
-    thread = myThread(threadID, str(i), length,i)
-    thread.start()
-    threads.append(thread)
-    threadID += 1       
-
-for t in threads:
-    t.join()
+    p=Process(target=pre_matching(),args=(length,i))
+    p.start()
+    process.append(p)      
+for p in process:
+        p.join()
 print('end')
 
