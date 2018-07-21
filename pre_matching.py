@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-21 12:35:05
+# @Last Modified time: 2018-07-21 12:36:20
 import numpy as np
 import os
 import time
@@ -97,7 +97,7 @@ def pre_matching(start,end):
         pre2.append(np.array([min_d,max_d]))
         pre_match=np.array([pre,pre2])
         np.save(os.path.join(match_dir,left_files[i]),pre_match)
-        print('thread:%d,doing:%d,time:%.3f' % (index,i,time.time()-start))
+        print('thread:%d,doing:%d,time:%.3f' % (end/440,i,time.time()-start))
 
 
 process = []
