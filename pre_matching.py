@@ -2,12 +2,13 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-21 12:36:20
+# @Last Modified time: 2018-07-21 16:31:20
 import numpy as np
 import os
 import time
 import matplotlib.pyplot as plt
 from multiprocessing import Process,Lock
+from multiprocessing import Pool
 thread_num=10
 def crop(object):
     ground=np.array((object==1).nonzero())
@@ -45,14 +46,14 @@ def pre_matching(start,end):
             if np.sum(object)>0:
                 l_box.append(crop(object))
             else:
-                l_box.append(0,0,1,1,1)
+                l_box.append((0,0,1,1,1))
         l_box=np.array(l_box)
         for m in range(int(np.max(right)+1)):
             object=np.where(right==m,1,0)
             if np.sum(object)>0:
                 r_box.append(crop(object))
             else:
-                r_box.append(0,0,1,1,1)
+                r_box.append((0,0,1,1,1))
         r_box=np.array(r_box)
         for m in range(int(np.max(left)+1)):
             x1,y1,x2,y2,size=l_box[m]
@@ -107,14 +108,14 @@ left_files.sort()
 length=len(left_files)
 start=[]
 end=[]
-for i in range(thread_num):
-    start.append(i*length/10)
-    end.append((i+1)*length/10)
-for i in range(thread_num):
-    p=Process(target=pre_matching,args=(start[i],end[i]))
-    p.start()
-    process.append(p)      
-for p in process:
-        p.join()
-print('end')
+p = Pool(thread_num)
+for z in range(thread_num):
+    start.append(z*length/10)
+    end.append((z+1)*length/10)
+# for z in range(thread_num):
+#     p.apply_async(pre_matching, args=(start[z],end[z]))
 
+# p.close()
+# p.join()
+pre_matching(start[6]+103,end[6])
+print('end')
