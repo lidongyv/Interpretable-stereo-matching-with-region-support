@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-20 20:15:39
+# @Last Modified time: 2018-08-24 23:18:41
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -170,9 +170,10 @@ class feature_extraction2(nn.Module):
 
         return output
 
+
 class aggregation_sparse(nn.Module):
     def __init__(self):
-        super(aggregation, self).__init__()
+        super(aggregation_sparse, self).__init__()
         self.s_conv = nn.Sequential(convbn(33, 32, 3, 1, 1, 1),
                                        nn.ReLU(inplace=True),
                                        convbn(32, 32, 3, 1, 1, 1),
@@ -268,7 +269,7 @@ class EDSNet(nn.Module):
 
     def __init__(self, 
                  P,
-                 pre,pre2,
+                 pre,
                  n_classes=9, 
                  block_config=[3, 4, 6, 3], 
                  input_size= (480, 640), 
@@ -285,67 +286,79 @@ class EDSNet(nn.Module):
         self.P=P
         #0 l to r,1 min,2 max
         #[l_box,r_box,match],[min_d,max_d]
-        self.pre=pre
-        self.pre2=pre2
+        self.pre=pre[1,0]
+        self.pre2=pre[0,0]
     def crop(self,x):
         index=(x==1).nonzero()
         return torch.min(index[:,0]),torch.max(index[:,0])+1,torch.min(index[:,1]),torch.max(index[:,1]+1)
+    def cluster(feature,mask):
+        count=torch.sum(mask)
+        mean=torch.sum(torch.sum(feature,dim=-1),dim=-1)/count
+        weights=torch.where(mask==ones,torch.norm(feature-mean,dim=1),zeros)
+        weights=torch.exp(weights/torch.max(weights)).view(weights.shape[0],weights.shape[1],1)
+        return weights
     def forward(self, l,r):
+        P1=self.P[...,0]
+        P2=self.P[...,3]
+        P3=self.P[...,1]
+        P4=self.P[...,2]
         #feature extraction
-        l_mask=P[:,:,3]-P[:,:,0]
-        s_mask=P[:,:,0]
+        l_mask=P2-P1
+        s_mask=P1
         l_lf=self.feature_extraction(l)
         l_sf=self.feature_extraction2(l)
         r_lf=self.feature_extraction(r)
         r_sf=self.feature_extraction2(r)
         #reshape the mask to batch and channel
-        feature=l_lf*l_mask+self.l_sf*s_mask
+        feature=l_lf*l_mask+l_sf*s_mask
         feature=torch.where((l_mask+s_mask)>0,feature,l_lf)
-        disparity=torch.zeros([540,960])
-        one=torch.ones(1)
-        zero=torch.zeros(1)
+        disparity=torch.zeros([540,960]).cuda()
+        one=torch.ones(1).cuda()
+        zero=torch.zeros(1).cuda()
         cost_volume=[]
         #promotion
         #we can segment with bounding box and divide the whole image into many parts
         #each single bounding box will be managed through network not the whole image
         #matching cost computation
         for i in range(torch.max(self.P[:,:,1]).type(torch.int32)+1):
-            min_d=self.pre2[i][0]
-            max_d=self.pre2[i][1]
+            min_d=self.pre[1,0][0,i]
+            max_d=self.pre[1,0][1,i]
             object_mask=torch.where(P[:,:,1]==i,one,zero)
             #x1,y1,x2,y2=crop(object_mask)
-            x1,y1,x2,y2,size=self.pre[0,0][0]
+            x1,y1,x2,y2,size=self.pre2[0]
             object_mask=object_mask[x1:x2,y1:y2]
             s_mask_o=object_mask*s_mask[x1:x2,y1:y2]
             l_mask_o=object_mask*l_mask[x1:x2,y1:y2]
             s_l_o=feature[...,x1:x2,y1:y2]*s_mask_o
             l_l_o=feature[...,x1:x2,y1:y2]*l_mask_o
-            s_r_o=r_sf[...,x1:x2,min_d:torch.min(max_d,r_lf.shape[-1])]
-            l_r_o=r_lf[...,x1:x2,min_d:torch.min(max_d,r_lf.shape[-1])]
+            s_r_o=r_sf[...,x1:x2,torch.max(min_d,zero):torch.min(max_d,one*960)]
+            l_r_o=r_lf[...,x1:x2,torch.max(min_d,zero):torch.min(max_d,one*960)]
+            min_d=y2-max_d
+            max_d=y1-min_d
             cost_s=[]
             cost_l=[]
-            for i in range(min_d,max_d):
-              if y1-i>0:
-                s_r_o_t=s_r_o[...,y1-i:y2-i]
+            for i in range(0,max_d-min_d):
+              if y2-y1-i>0:
+                s_r_o_t=s_r_o[...,y2-y1-i:-i]
                 cost_s.append(torch.where(s_mask_o==1,cosine_s(s_l_o,s_r_o_t),zero))
               else:
-                s_r_o_t=torch.cat([torch.zeros_like(s_r_o[...,:i]),s_r_o[...,0:y2-i]],-1)
+                s_r_o_t=torch.cat([torch.zeros_like(s_r_o[...,:y2-y1-i]),s_r_o[...,0:-i]],-1)
                 cost_s.append(torch.where(s_mask_o==1,cosine_s(s_l_o,s_r_o_t),zero))
             cost_s=torch.stack(cost_s,-1)
-            for i in range(min_d,max_d):
-              if y1-i>0:
-                l_r_o_t=l_r_o[...,y1-i:y2-i]
+            for i in range(0,max_d-min_d):
+              if y2-y1-i>0:
+                l_r_o_t=l_r_o[...,y2-y1-i:-i]
                 cost_l.append(torch.where(l_mask_o==1,cosine_s(l_l_o,l_r_o_t),zero))
               else:
-                l_r_o_t=torch.cat([torch.zeros_like(l_r_o[...,:i]),l_r_o[...,0:y2-i]],-1)
+                l_r_o_t=torch.cat([torch.zeros_like(l_r_o[...,:y2-y1-i]),l_r_o[...,0:-i]],-1)
                 cost_l.append(torch.where(l_mask_o==1,cosine_s(l_l_o,l_r_o_t),zero))                
             cost_l=torch.stack(cost_l,-1)
             cost_volume=cost_s+cost_l
             #aggregation
             a_volume=torch.zeros_like(cost_volume)
-            object_r=torch.where(P[:,:,1]==i,self.P[:,:,2],zero)
+            object_r=torch.where(P3==i,P4,zero)
             max_r=torch.max(object_r)
-            object_r=torch.where(P[:,:,1]==i,self.P[:,:,2],max_r+1)
+            object_r=torch.where(P3==i,P4,max_r+1)
             min_r=torch.min(object_r)
             for j in range(min_r,max_r+1):
                 plane_mask=torch.where(object_r==j,one,zero)[x1:x2,y1:y2]
@@ -353,11 +366,24 @@ class EDSNet(nn.Module):
                 #xp1,xp2,yp1,yp2.r_size=self.pre[0,0][1]
                 plane_mask=plane_mask[xp1:xp2,yp1:yp2]
                 plane=cost_volume[...,xp1:xp2,yp1:yp2,:]
-                for m in range(planes.shape[-1])
-                    s_var,l_var=self.aggregation_sparse(l_sf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],plane[...,m]*plane_mask)
-                    plane[...,m]=s_var*s_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]+l_var*l_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
-                    plane[...,m]=plane[...,m]*plane_mask
-                    plane[...,m]=self.aggregation_dense(feature[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],plane[...,m])*plane_mask
+                s_plane_mask=plane_mask*s_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
+                l_plane_mask=plane_mask*l_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
+                s_weights=self.cluster(l_sf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],s_plane_mask)
+                s_cost=torch.sum(torch.sum(plane*s_weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(s_weights)
+                l_weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],l_plane_mask)
+                l_cost=torch.sum(torch.sum(plane*l_weights,-2),-2)/torch.sum(l_weights)
+                plane_mask=plane_mask-torch.where(s_plane_mask+l_plane_mask>0,one,zero)
+                plane_mask=plane_mask.view(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],1) \
+                          .expand(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],plane.shape[-1])
+                s_plane_mask=s_plane_mask.view(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],1) \
+                          .expand(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],plane.shape[-1])  
+                l_plane_mask=l_plane_mask.view(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],1) \
+                          .expand(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],plane.shape[-1])  
+                plane=torch.where(s_plane_mask==1,s_cost*s_weights,plane)
+                plane=torch.where(l_plane_mask==1,l_cost*l_weights,plane)
+                weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],plane_mask)
+                costs=torch.sum(torch.sum(plane*weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(weights)
+                plane=torch.where(plane_mask==1,cost*weights,plane)
                 cost_volume[...,xp1:xp2,yp1:yp2,:]=plane
             #ss_argmin
             disparity[...,x1:x2,y1:y2]=ss_argmin(cost_volume,min_d,max_d)
@@ -367,8 +393,19 @@ class EDSNet(nn.Module):
                 plane_mask=torch.where(object_r==j,one,zero)[x1:x2,y1:y2]
                 xp1,xp2,yp1,yp2=crop(plane_mask)
                 plane_mask=plane_mask[xp1:xp2,yp1:yp2]
+                s_plane_mask=plane_mask*s_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
+                l_plane_mask=plane_mask*l_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
+                plane_mask=plane_mask-torch.where(s_plane_mask+l_plane_mask>0,one,zero)
                 plane=disparity[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2]*plane_mask
-                plane=self.aggregation_dense(feature[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],plane)*plane_mask
+                s_weights=self.cluster(l_sf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],s_plane_mask)
+                s_cost=torch.sum(torch.sum(plane*s_weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(s_weights)
+                l_weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],l_plane_mask)
+                l_cost=torch.sum(torch.sum(plane*l_weights,-2),-2)/torch.sum(l_weights)
+                weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],plane_mask)
+                costs=torch.sum(torch.sum(plane*weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(weights)
+                plane=torch.where(s_plane_mask==1,s_cost*s_weights,plane)
+                plane=torch.where(l_plane_mask==1,l_cost*l_weights,plane)                           
+                plane=torch.where(plane_mask==1,cost*weights,plane)
                 disparity[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2]=plane
                 
         return disparity

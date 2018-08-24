@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-16 22:16:14
+# @Last Modified time: 2018-08-24 20:23:22
 
 import torch
 import numpy as np
@@ -279,27 +279,32 @@ class EDSNet(nn.Module):
         # self.refinement_dense=aggregation_dense()        
         self.P=P
         #0 l to r,1 min,2 max
-        self.pre=pre
+        self.pre=pre[1,0]
     def crop(self,x):
         index=(x==1).nonzero()
+        return index
     def forward(self, l,r):
-        l_mask=P[:,:,3]-P[:,:,0]
-        s_mask=P[:,:,0]
+        P1=self.P[...,0]
+        P2=self.P[...,3]
+        P3=self.P[...,1]
+        P4=self.P[...,2]
+        l_mask=P2-P1
+        s_mask=P1
         l_lf=self.feature_extraction(l)
         l_sf=self.feature_extraction2(l)
         r_lf=self.feature_extraction(r)
         r_sf=self.feature_extraction2(r)
         #reshape the mask to batch and channel
-        feature=l_lf(l)*l_mask+self.l_sf(l)*s_mask
+        feature=l_lf*l_mask+self.l_sf*s_mask
         disparity=torch.zeros([540,960])
         one=torch.ones(1)
         zero=torch.zeros(1)
         #promotion
         #we can segment with bounding box and divide the whole image into many parts
         #each single bounding box will be managed through network not the whole image
-        for i in range(torch.max(self.P[:,:,1]).type(torch.int32)+1):
-            min_d=torch.where(P[:,:,1]==i,self.pre[:,:,1],-1)
-            max_d=torch.where(P[:,:,1]==i,self.pre[:,:,2],-1)
+        for i in range(torch.max(self.P3).type(torch.int32)+1):
+            min_d=torch.where(P3==i,self.pre[i,0],-1)
+            max_d=torch.where(P3==i,self.pre[i,1],-1)
             object_mask=torch.where(P[:,:,1]==i,one,zero)
             s_mask_o=object_mask*s_mask
             l_mask_o=object_mask*l_mask
@@ -352,12 +357,6 @@ class EDSNet(nn.Module):
                 plane=disparity*plane_mask
                 plane=self.aggregation_dense(l_sf,l_lf,plane)*plane_mask
                 refine+=plane
-
-
-
-
-            
-
         return refine
 
 

@@ -2,8 +2,8 @@
 # @Author: yulidong
 # @Date:   2018-06-20 14:37:27
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-07 19:10:16
-import cupy as cp
+# @Last Modified time: 2018-08-10 21:32:24
+
 import cv2
 import numpy as np
 import os
@@ -32,85 +32,85 @@ division2=50
 # n_object.sort()
 pathl=[
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/15mm_focallength/scene_forwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/15mm_focallength/scene_forwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/15mm_focallength/scene_forwards/fast/left',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/15mm_focallength/scene_forwards/fast/left',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/15mm_focallength/scene_backwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/15mm_focallength/scene_backwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/15mm_focallength/scene_backwards/fast/left',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/15mm_focallength/scene_backwards/fast/left',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/35mm_focallength/scene_forwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/35mm_focallength/scene_forwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/35mm_focallength/scene_forwards/fast/left',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/35mm_focallength/scene_forwards/fast/left',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/35mm_focallength/scene_backwards/slow/left',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/35mm_focallength/scene_backwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/35mm_focallength/scene_backwards/fast/left'      
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/35mm_focallength/scene_backwards/fast/left'      
       ]
 pathl.sort()
 pathr=[
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/15mm_focallength/scene_forwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/15mm_focallength/scene_forwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/15mm_focallength/scene_forwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/15mm_focallength/scene_forwards/fast/right',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/15mm_focallength/scene_backwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/15mm_focallength/scene_backwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/15mm_focallength/scene_backwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/15mm_focallength/scene_backwards/fast/right',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/35mm_focallength/scene_forwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/35mm_focallength/scene_forwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/35mm_focallength/scene_forwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/35mm_focallength/scene_forwards/fast/right',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/35mm_focallength/scene_backwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/35mm_focallength/scene_backwards/slow/right',
 
-        r'/home/lidong/Documents/datasets/Driving/frames_finalpass/35mm_focallength/scene_backwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/frames_cleanpass/35mm_focallength/scene_backwards/fast/right',
      
       ]
 pathr.sort()
 pathd=[
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_forwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_forwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_forwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_forwards/fast/left',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_backwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_backwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_backwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/disparity/15mm_focallength/scene_backwards/fast/left',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_forwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_forwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_forwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_forwards/fast/left',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_backwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_backwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_backwards/fast/right'      
+        r'/home/lidong/Documents/datasets/Driving/disparity/35mm_focallength/scene_backwards/fast/left'      
       ]
 pathd.sort()
 paths=[
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_forwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_forwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_forwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_forwards/fast/left',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_backwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_backwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_backwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/object_index/15mm_focallength/scene_backwards/fast/left',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_forwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_forwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_forwards/fast/right',
+        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_forwards/fast/left',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_backwards/slow/right',
+        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_backwards/slow/left',
 
-        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_backwards/fast/right'      
+        r'/home/lidong/Documents/datasets/Driving/object_index/35mm_focallength/scene_backwards/fast/left'      
       ]
 paths.sort()
 p_left_image=[]
 p_right_image=[]
 p_disparity=[]
 p_semantic=[]
-output_dir=r'/home/lidong/Documents/datasets/Driving/train_data_final_pass/right/'
+output_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
 path=pathd
 for p in range(len(path)):
     file=os.listdir(path[p])
@@ -139,14 +139,14 @@ for p in range(len(path)):
     for f in range(len(file)):
         p_right_image.append(os.path.join(path[p],file[f]))
         #print(os.path.join(path[p],file[f]))
-length=len(p_right_image)
+length=len(p_left_image)
 
 for f in range(length):
     print(f)
     labels=[]
     start=time.time()
-    l_image=np.array(cv2.imread(p_left_image[f]))
-    r_image=np.array(cv2.imread(p_right_image[f]))
+    l_image=np.array(cv2.imread(p_left_image[f]))[:,:,::-1]
+    r_image=np.array(cv2.imread(p_right_image[f]))[:,:,::-1]
     disparity=np.array(readPFM(p_disparity[f])[0])
     object=np.array(readPFM(p_semantic[f])[0])
     # #object statistics

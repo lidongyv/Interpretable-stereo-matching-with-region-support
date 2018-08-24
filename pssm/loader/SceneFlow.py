@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-03-19 13:33:07
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-20 16:56:15
+# @Last Modified time: 2018-08-10 15:19:52
 
 import os
 import torch
@@ -51,7 +51,9 @@ class SceneFlow(data.Dataset):
         data=np.load(os.path.join(self.datapath,'left',self.left_files[index]))
         data=data[:540,:960,:]
         left=data[0:3]
+
         right=data[3:6]
+
         disparity=data[6]
         P=data[7:]
         pre_match=np.load(os.path.join(self.datapath,'match',self.left_files[index]))
