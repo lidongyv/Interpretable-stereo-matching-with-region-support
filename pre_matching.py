@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-27 10:24:48
+# @Last Modified time: 2018-08-27 11:37:42
 import numpy as np
 import os
 import time
@@ -95,17 +95,17 @@ def pre_matching(start,end):
         pre.append([l_box,r_box,match])
         #min_d=np.array(np.max([np.where(match==-1,0,r_box[match,1]+l_box[:,1]-l_box[:,3]),np.zeros_like(match)],0))
         #max_d=np.array(np.min([np.where(match==-1,l_box[:,3],r_box[match,3]+l_box[:,3]-l_box[:,1]),min_d+300],0))
-        variance_d=np.floor((l_box[:,2]-l_box[:,1])/10).astype(np.int)
+        variance_d=np.floor((l_box[:,3]-l_box[:,1])/10).astype(np.int)
         min_d=np.where(match==-1,0,np.max([l_box[:,1]-r_box[match,1]-variance_d,np.zeros_like(match)],0))
-        max_d=np.where(match==-1,192,np.min([l_box[:,2]-r_box[match,2]+variance_d,np.ones_like(match)*192],0))
+        max_d=np.where(match==-1,192,np.min([l_box[:,3]-r_box[match,3]+variance_d,np.ones_like(match)*192],0))
         # if min_d>l_box[:,2]:
         #     min_d=0
         # else:
         #     min_d=np.max([min_d,0])
 
-        min_d=np.where(min_d>l_box[:,2],0,np.max([min_d,np.zeros_like(match)],0))
+        min_d=np.where(min_d>l_box[:,3],0,np.max([min_d,np.zeros_like(match)],0))
         max_d=np.where(max_d<=min_d,min_d+192,max_d)
-        max_d=np.min([max_d,l_box[:,2]],0)
+        max_d=np.min([max_d,l_box[:,3]],0)
         pre2.append(np.array([min_d,max_d]))
         pre_match=np.array([pre,pre2])
         np.save(os.path.join(match_dir,left_files[i]),pre_match)
