@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-27 11:37:42
+# @Last Modified time: 2018-08-27 22:19:08
 import numpy as np
 import os
 import time
@@ -96,13 +96,12 @@ def pre_matching(start,end):
         #min_d=np.array(np.max([np.where(match==-1,0,r_box[match,1]+l_box[:,1]-l_box[:,3]),np.zeros_like(match)],0))
         #max_d=np.array(np.min([np.where(match==-1,l_box[:,3],r_box[match,3]+l_box[:,3]-l_box[:,1]),min_d+300],0))
         variance_d=np.floor((l_box[:,3]-l_box[:,1])/10).astype(np.int)
-        min_d=np.where(match==-1,0,np.max([l_box[:,1]-r_box[match,1]-variance_d,np.zeros_like(match)],0))
-        max_d=np.where(match==-1,192,np.min([l_box[:,3]-r_box[match,3]+variance_d,np.ones_like(match)*192],0))
-        # if min_d>l_box[:,2]:
-        #     min_d=0
-        # else:
-        #     min_d=np.max([min_d,0])
-
+        a=l_box[:,1]-r_box[match,1]
+        b=l_box[:,3]-r_box[match,3]
+        min_d=np.where(match==-1,0,np.max([np.min([a,b],0)-variance_d,np.zeros_like(match)],0))
+        max_d=np.where(match==-1,192,np.min([np.max([a,b],0)+variance_d,np.ones_like(match)*192+min_d],0))
+        min_d=np.where(l_box[:,3]-l_box[:,1]>900,0,min_d)
+        max_d=np.where(l_box[:,3]-l_box[:,1]>900,l_box[:,2]-l_box[:,0],max_d)
         min_d=np.where(min_d>l_box[:,3],0,np.max([min_d,np.zeros_like(match)],0))
         max_d=np.where(max_d<=min_d,min_d+192,max_d)
         max_d=np.min([max_d,l_box[:,3]],0)

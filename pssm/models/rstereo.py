@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-27 11:40:03
+# @Last Modified time: 2018-08-27 22:01:26
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -255,14 +255,15 @@ class rstereo(nn.Module):
         count=torch.sum(mask)
         mean=torch.sum(torch.sum(feature,dim=-1),dim=-1)/count
         weights=torch.where(mask==ones,torch.norm(feature-mean,dim=1),zeros)
-        weights=torch.exp(weights/torch.max(weights)).view(weights.shape[0],weights.shape[1],1)
+        weights=torch.exp(weights/torch.max(weights)).reshape(weights.shape[0],weights.shape[1],1)
         return weights
     def forward(self, l,r,P,pre1,pre2):
         #self.P=P[1,0]
         #0 l to r,1 min,2 max
         #[l_box,r_box,match],[min_d,max_d]
-        self.pre=pre1
-        self.pre2=pre2
+        with torch.no_grad():
+          self.pre=pre1
+          self.pre2=pre2
         P1=P[...,0]
         P2=P[...,3]
         P3=P[...,1]
@@ -270,6 +271,8 @@ class rstereo(nn.Module):
         #feature extraction
         l_mask=P2-P1
         s_mask=P1
+        #l_mask=l_mask.byte()
+        #s_mask=s_mask.byte()
         #basic cuda 524
         #print(l.type)
          #1923
@@ -302,13 +305,76 @@ class rstereo(nn.Module):
         r_sf=r_sf.cuda(2)
         l_sf=l_sf.cuda(2)
         #985
+        #feature=torch.masked_select(l_sf,s_mask)
+        #feature=torch.masked_select(l_lf,l_mask)+torch.masked_select(l_sf,s_mask)
         feature=l_lf*l_mask+l_sf*s_mask
         feature=torch.where((l_mask+s_mask)>0,feature,l_lf)
-        # for i in range(100):
-        #   cost_volume.append(cosine_s(l_lf,torch.cat([r_lf[...,i:],r_lf[...,:i]],-1)))
-        # cost_volume=torch.stack(cost_volume)
+        with torch.no_grad():
+          s_match=s_mask.nonzero()
+        s_feature=l_sf[...,s_match[:,0],s_match[:,1]]
+        with torch.no_grad():
+          l_match=l_mask.nonzero()
+        l_feature=l_lf[...,l_match[:,0],l_match[:,1]]
+
+        # start_time=time.time()
+        # # #0.04s
+        # sy_match=s_match[:,1]
+        # sx_match=s_match[:,0]
+        # with torch.no_grad():
+        #   # for i in range(1,192):
+        #   #   sy_match=torch.cat([sy_match,s_match[:,1]-i],0)
+        #   d=192
+        #   sx_match=sx_match.repeat(1,d)
+        #   sy_match=sy_match.repeat(1,d)
+        #   #print(sy_match.shape)
+        #   sy_match-=torch.arange(0,d).repeat(s_match.shape[0],1).transpose(1,0).contiguous().view_as(sy_match).cuda(2)
+        # #192,0.09s,30,0.01
+        # s_r_o_t=r_sf[...,sx_match,sy_match].reshape(1,32,s_feature.shape[-1],d)
+        # s_feature=s_feature.repeat(1,1,1,d).reshape(1,32,s_feature.shape[-1],d)
+        # print(s_feature.shape,s_r_o_t.shape)
+        # cost_volume.append(torch.where(sy_match.reshape(1,s_feature.shape[-2],d)>=0,cosine_s(s_feature,s_r_o_t),zero))
+        # ly_match=l_match[:,1]
+        # lx_match=l_match[:,0]
+        # with torch.no_grad():
+        #   # for i in range(1,192):
+        #   #   sy_match=torch.cat([sy_match,s_match[:,1]-i],0)
+        #   d=192
+        #   lx_match=lx_match.repeat(1,d)
+        #   ly_match=ly_match.repeat(1,d)
+        #   #print(sy_match.shape)
+        #   ly_match-=torch.arange(0,d).repeat(l_match.shape[0],1).transpose(1,0).contiguous().view_as(ly_match).cuda(2)
+        # #192,0.09s,30,0.01,lf0.19
+        # l_r_o_t=r_lf[...,lx_match,ly_match].reshape(1,32,l_feature.shape[-1],d)
+        # l_feature=l_feature.repeat(1,1,1,d).reshape(1,32,l_feature.shape[-1],d)
+        # #print(s_feature.shape,s_r_o_t.shape)
+        # cost_volume.append(torch.where(ly_match.reshape(1,l_feature.shape[-2],d)>=0,cosine_s(l_feature,l_r_o_t),zero))
+        # #0.0003
+        # #s_r_o_t=r_sf[...,s_match[:,0],s_match[:,1]]
+        # #1,32,n
+        # #print(time.time()-start_time)
+        # #print(s_match.shape)
+        # #time 10
+        # # for i in range(s_match.shape[0]):
+        # #   min_d=torch.max(s_match[i,1]-300,zero.long())
+        # #   #print(min_d)
+        # #   s_r_o_t=r_sf[...,s_match[i,0],min_d:s_match[i,1]]
+          
+        # #   a=s_feature[...,i].reshape(1,32,1)
+        # #   #print(a.shape,s_r_o_t.shape)
+        # #   cost_volume.append(torch.where(s_match[i,1]-300>=0,cosine_s(a,s_r_o_t),zero))
+
+        # #time 0.23,192,0.035,30, the number of the match points won't influence the time,only the iteration
+
+        # for i in range(30):
+        #   s_r_o_t=r_sf[...,s_match[:,0],s_match[:,1]-i]
+        #   #s_r_o_t=torch.take(r_sf,[...,s_match[:,0],s_match[:,1]-i])
+        #   cost_volume.append(torch.where(s_match[:,1]-i>=0,cosine_s(s_feature,s_r_o_t),zero))
+        #   l_r_o_t=r_sf[...,l_match[:,0],l_match[:,1]-i]
+        #   cost_volume.append(torch.where(l_match[:,1]-i>=0,cosine_s(l_feature,l_r_o_t),zero))          
+        #cost_volume=torch.stack(cost_volume)
         # print(torch.cuda.memory_allocated(2))
-        #time.sleep(100)
+        # print(time.time()-start_time)
+        # time.sleep(100)
         
         #promotion
         #we can segment with bounding box and divide the whole image into many parts
@@ -318,114 +384,45 @@ class rstereo(nn.Module):
         start_time=time.time()
         for i in range(torch.max(P3).type(torch.int32)+1):
             #ground 0-270, sky 0-40
-            # if i==13 or i == 14:
-            #   continue
-            # i=60
-            #print(pre2.shape)
-            #i=14
+            #0.19
             min_d=pre1[0,0,i].long()
             max_d=pre1[0,1,i].long()
-            object_mask=torch.where(P3==i,one,zero)
+            #object_mask=torch.where(P3==i,one,zero)
             x1,y1,x2,y2,size=pre2[0,i].long()
-            object_mask=object_mask[0,x1:x2,y1:y2]
+            object_mask=P3[0,x1:x2,y1:y2]
+            object_mask=torch.where(object_mask==i,one,zero)
             s_mask_o=object_mask*s_mask[0,x1:x2,y1:y2]
             l_mask_o=object_mask*l_mask[0,x1:x2,y1:y2]
             s_match=s_mask_o.nonzero()
             l_match=l_mask_o.nonzero()
+            if s_match.shape[0]==0:
+              s_match=object_mask.nonzero()
+            if l_match.shape[0]==0:
+              l_match=object_mask.nonzero()
             s_l_o=feature[...,s_match[:,0],s_match[:,1]]
             l_l_o=feature[...,l_match[:,0],l_match[:,1]]
-            #print(torch.max(min_d,zero).long())
-
-
-            # s_r_o=r_sf[...,x1:x2,y1-max_d:y2-min_d]
-            # l_r_o=r_lf[...,x1:x2,y1-max_d:y2-min_d]
             cost_s=[]
             cost_l=[]
-            #ground and sky
-            #print(x1,x2,y1,y2,min_d,max_d)
-            for j in range(min_d,max_d):
-              #print(j)
-              #count+=1
-              #print(count)
-              if y1-j>0:
-                #print(y1-y2-i,-i)
-                s_r_o_t=r_sf[...,x1:x2,y1-j:y2-j]
-                #print(s_r_o_t.shape)
-                cost_s.append(torch.where(s_mask_o==1,cosine_s(s_l_o,s_r_o_t),zero))
-              else:
-                #print(i-y1,y2-i)
-                  s_r_o_t=torch.cat([r_sf[...,x1:x2,0:j-y1]*zero,r_sf[...,x1:x2,0:y2-j]],-1)
-                  #print(y2-j)
-                  cost_s.append(torch.where(s_mask_o==1,cosine_s(s_l_o,s_r_o_t),zero))
-            cost_s=torch.stack(cost_s,-1)
-            for j in range(min_d,max_d):
-              if y1-j>0:
-                l_r_o_t=r_lf[...,x1:x2,y1-j:y2-j]
-                cost_l.append(torch.where(l_mask_o==1,cosine_s(l_l_o,l_r_o_t),zero))
-              else:
-                  #print(r_lf.shape,r_sf.shape)               
-                  l_r_o_t=torch.cat([r_lf[...,x1:x2,0:j-y1]*zero,r_lf[...,x1:x2,0:y2-j]],-1)
-                  cost_l.append(torch.where(l_mask_o==1,cosine_s(l_l_o,l_r_o_t),zero))         
-            cost_l=torch.stack(cost_l,-1)
-            cost_volume=cost_s+cost_l
-            print(torch.cuda.memory_allocated(2)/1e+6)
-            #time.sleep(30)
-            """
+            sy_match=s_match[:,1]
+            sx_match=s_match[:,0]
+            print(sy_match.shape)
+            with torch.no_grad():
+              d=max_d-min_d
+              print(d)
+              sx_match=sx_match.repeat(1,d)
+              sy_match=sy_match.repeat(1,d)
+              sy_match-=torch.arange(min_d,max_d).repeat(s_match.shape[0],1).transpose(1,0).contiguous().view_as(sy_match).cuda(2)
+            s_r_o_t=r_sf[...,sx_match,sy_match].reshape(1,32,s_l_o.shape[-1],d)
+            s_l_o=s_l_o.repeat(1,1,1,d).reshape(1,32,s_l_o.shape[-1],d)
+            cost_s.append(torch.where(sy_match.reshape(1,s_l_o.shape[-2],d)>=0,cosine_s(s_l_o,s_r_o_t),zero))
+
+
             
-            #aggregation
-            a_volume=torch.zeros_like(cost_volume)
-            object_r=torch.where(P3==i,P4,zero)
-            max_r=torch.max(object_r).long()
-            object_r=torch.where(P3==i,P4,max_r+1)
-            min_r=torch.min(object_r).long()
-            for j in range(min_r,max_r+1):
-                plane_mask=torch.where(object_r==j,one,zero)[x1:x2,y1:y2]
-                xp1,xp2,yp1,yp2=crop(plane_mask).long()
-                #xp1,xp2,yp1,yp2.r_size=self.pre[0,0][1]
-                plane_mask=plane_mask[xp1:xp2,yp1:yp2]
-                plane=cost_volume[...,xp1:xp2,yp1:yp2,:]
-                s_plane_mask=plane_mask*s_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
-                l_plane_mask=plane_mask*l_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
-                s_weights=self.cluster(l_sf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],s_plane_mask)
-                s_cost=torch.sum(torch.sum(plane*s_weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(s_weights)
-                l_weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],l_plane_mask)
-                l_cost=torch.sum(torch.sum(plane*l_weights,-2),-2)/torch.sum(l_weights)
-                plane_mask=plane_mask-torch.where(s_plane_mask+l_plane_mask>0,one,zero)
-                plane_mask=plane_mask.view(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],1) \
-                          .expand(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],plane.shape[-1])
-                s_plane_mask=s_plane_mask.view(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],1) \
-                          .expand(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],plane.shape[-1])  
-                l_plane_mask=l_plane_mask.view(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],1) \
-                          .expand(plane_mask.shape[0],plane_mask.shape[1],plane_mask.shape[2],plane.shape[-1])  
-                plane=torch.where(s_plane_mask==1,s_cost*s_weights,plane)
-                plane=torch.where(l_plane_mask==1,l_cost*l_weights,plane)
-                weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],plane_mask)
-                costs=torch.sum(torch.sum(plane*weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(weights)
-                plane=torch.where(plane_mask==1,cost*weights,plane)
-                cost_volume[...,xp1:xp2,yp1:yp2,:]=plane
-            #ss_argmin
-            disparity[...,x1:x2,y1:y2]=ss_argmin(cost_volume,min_d,max_d)
-            #refinement
-            refine=torch.zeros_like(disparity)[...,x1:x2,y1:y2]
-            for j in range(min_r,max_r+1):
-                plane_mask=torch.where(object_r==j,one,zero)[x1:x2,y1:y2]
-                xp1,xp2,yp1,yp2=crop(plane_mask)
-                plane_mask=plane_mask[xp1:xp2,yp1:yp2]
-                s_plane_mask=plane_mask*s_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
-                l_plane_mask=plane_mask*l_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
-                plane_mask=plane_mask-torch.where(s_plane_mask+l_plane_mask>0,one,zero)
-                plane=disparity[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2]*plane_mask
-                s_weights=self.cluster(l_sf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],s_plane_mask)
-                s_cost=torch.sum(torch.sum(plane*s_weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(s_weights)
-                l_weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],l_plane_mask)
-                l_cost=torch.sum(torch.sum(plane*l_weights,-2),-2)/torch.sum(l_weights)
-                weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],plane_mask)
-                costs=torch.sum(torch.sum(plane*weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(weights)
-                plane=torch.where(s_plane_mask==1,s_cost*s_weights,plane)
-                plane=torch.where(l_plane_mask==1,l_cost*l_weights,plane)                           
-                plane=torch.where(plane_mask==1,cost*weights,plane)
-                disparity[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2]=plane
-            """
+
+            
+            #cost_volume=cost_s+cost_l
+            #print(torch.cuda.memory_allocated(2)/1e+6)
+            #time.sleep(30)
         print(time.time()-start_time)
         time.sleep(100)
         return cost_volume

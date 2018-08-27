@@ -2,12 +2,13 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-26 23:45:59
+# @Last Modified time: 2018-08-27 14:23:20
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
 # @Last Modified by:   yulidong
 # @Last Modified time: 2018-07-16 22:16:14
+#2.4s
 import time
 import torch
 import numpy as np

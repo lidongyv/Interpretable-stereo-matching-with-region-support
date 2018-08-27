@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-26 16:39:59
+# @Last Modified time: 2018-08-27 19:11:09
 import sys
 import torch
 import visdom
@@ -140,23 +140,23 @@ def train(args):
         print('training!')
         model.train()
         for i, (left, right,disparity,P,pre1,pre2) in enumerate(trainloader):
-            #with torch.no_grad():
-            #print(left.shape)
-            left = left.cuda(0)
-            right = right.cuda(0)
-            disparity = disparity.cuda(0)
-            P = P.cuda(2)
-            pre1 = pre1.cuda(2)
-            pre2=pre2.cuda(2)
-            optimizer.zero_grad()
-            #print(P.shape)
-            outputs = model(left,right,P=P,pre1=pre1,pre2=pre2)
+            with torch.no_grad():
+                #print(left.shape)
+                left = left.cuda(0)
+                right = right.cuda(0)
+                disparity = disparity.cuda(0)
+                P = P.cuda(2)
+                pre1 = pre1.cuda(2)
+                pre2=pre2.cuda(2)
+                optimizer.zero_grad()
+                #print(P.shape)
+                outputs = model(left,right,P=P,pre1=pre1,pre2=pre2)
 
-            #outputs=outputs
-            loss = loss_fn(input=outputs, target=disparity)
-            # print('training:'+str(i)+':learning_rate'+str(loss.data.cpu().numpy()))
-            loss.backward()
-            optimizer.step()
+                #outputs=outputs
+                loss = loss_fn(input=outputs, target=disparity)
+                # print('training:'+str(i)+':learning_rate'+str(loss.data.cpu().numpy()))
+                loss.backward()
+                optimizer.step()
             # print(torch.Tensor([loss.data[0]]).unsqueeze(0).cpu())
             #print(loss.item()*torch.ones(1).cpu())
             #nyu2_train:246,nyu2_all:816
