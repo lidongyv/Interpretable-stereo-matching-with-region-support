@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-21 16:31:20
+# @Last Modified time: 2018-08-27 10:24:48
 import numpy as np
 import os
 import time
@@ -40,7 +40,7 @@ def pre_matching(start,end):
         l_box=[]
         r_box=[]
         match=[]
-        start=time.time()
+        start_time=time.time()
         for m in range(int(np.max(left)+1)):
             object=np.where(left==m,1,0)
             if np.sum(object)>0:
@@ -93,12 +93,23 @@ def pre_matching(start,end):
                 match.append(-1)
         match=np.array(match)
         pre.append([l_box,r_box,match])
-        min_d=np.array(np.max([np.where(match==-1,0,r_box[match,1]+l_box[:,1]-l_box[:,3]),np.zeros_like(match)],0))
-        max_d=np.array(np.min([np.where(match==-1,l_box[:,3],r_box[match,3]+l_box[:,3]-l_box[:,1]),min_d+300],0))
+        #min_d=np.array(np.max([np.where(match==-1,0,r_box[match,1]+l_box[:,1]-l_box[:,3]),np.zeros_like(match)],0))
+        #max_d=np.array(np.min([np.where(match==-1,l_box[:,3],r_box[match,3]+l_box[:,3]-l_box[:,1]),min_d+300],0))
+        variance_d=np.floor((l_box[:,2]-l_box[:,1])/10).astype(np.int)
+        min_d=np.where(match==-1,0,np.max([l_box[:,1]-r_box[match,1]-variance_d,np.zeros_like(match)],0))
+        max_d=np.where(match==-1,192,np.min([l_box[:,2]-r_box[match,2]+variance_d,np.ones_like(match)*192],0))
+        # if min_d>l_box[:,2]:
+        #     min_d=0
+        # else:
+        #     min_d=np.max([min_d,0])
+
+        min_d=np.where(min_d>l_box[:,2],0,np.max([min_d,np.zeros_like(match)],0))
+        max_d=np.where(max_d<=min_d,min_d+192,max_d)
+        max_d=np.min([max_d,l_box[:,2]],0)
         pre2.append(np.array([min_d,max_d]))
         pre_match=np.array([pre,pre2])
         np.save(os.path.join(match_dir,left_files[i]),pre_match)
-        print('thread:%d,doing:%d,time:%.3f' % (end/440,i,time.time()-start))
+        print('thread:%d,doing:%d,time:%.3f' % (end/440,i,time.time()-start_time))
 
 
 process = []
@@ -112,10 +123,10 @@ p = Pool(thread_num)
 for z in range(thread_num):
     start.append(z*length/10)
     end.append((z+1)*length/10)
-# for z in range(thread_num):
-#     p.apply_async(pre_matching, args=(start[z],end[z]))
+for z in range(thread_num):
+    p.apply_async(pre_matching, args=(start[z],end[z]))
 
-# p.close()
-# p.join()
-pre_matching(start[6]+103,end[6])
+p.close()
+p.join()
+#pre_matching(0,1)
 print('end')

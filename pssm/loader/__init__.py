@@ -1,10 +1,7 @@
 import json
 
-from rsden.loader.SceneFlow import SceneFlow
-from rsden.loader.NYU1 import NYU1
-from rsden.loader.NYU2 import NYU2
-from rsden.loader.NYU import NYU
-from rsden.loader.KITTI import KITTI
+from pssm.loader.SceneFlow import SceneFlow
+
 def get_loader(name):
     """get_loader
 
@@ -13,10 +10,6 @@ def get_loader(name):
     print(name)
     return {
         'sceneflow': SceneFlow,
-        'nyu1':NYU1,
-        'nyu2':NYU2,
-        'nyu':NYU,
-        'kitti':KITTI,
     }[name]
 
 

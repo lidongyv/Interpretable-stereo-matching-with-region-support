@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-05-11 20:44:24
+# @Last Modified time: 2018-08-26 16:39:59
 import sys
 import torch
 import visdom
@@ -16,11 +16,11 @@ from torch.autograd import Variable
 from torch.utils import data
 from tqdm import tqdm
 
-from rsden.models import get_model
-from rsden.loader import get_loader, get_data_path
-from rsden.metrics import runningScore
-from rsden.loss import *
-from rsden.augmentations import *
+from pssm.models import get_model
+from pssm.loader import get_loader, get_data_path
+from pssm.metrics import runningScore
+from pssm.loss import *
+from pssm.augmentations import *
 import os
 
 
@@ -35,13 +35,13 @@ def train(args):
     data_loader = get_loader(args.dataset)
     data_path = get_data_path(args.dataset)
     t_loader = data_loader(data_path, is_transform=True,
-                           split='train_region', img_size=(args.img_rows, args.img_cols),task='region')
+                           split='train', img_size=(args.img_rows, args.img_cols))
     v_loader = data_loader(data_path, is_transform=True,
-                           split='test_region', img_size=(args.img_rows, args.img_cols),task='region')
+                           split='test', img_size=(args.img_rows, args.img_cols))
 
     n_classes = t_loader.n_classes
     trainloader = data.DataLoader(
-        t_loader, batch_size=args.batch_size, num_workers=4, shuffle=True)
+        t_loader, batch_size=args.batch_size, num_workers=4, shuffle=False)
     valloader = data.DataLoader(
         v_loader, batch_size=args.batch_size, num_workers=4)
 
@@ -73,25 +73,18 @@ def train(args):
         )
     # Setup Model
     model = get_model(args.arch)
-    model = torch.nn.DataParallel(
-        model, device_ids=range(torch.cuda.device_count()))
-    #model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
-    model.cuda()
+    # model = torch.nn.DataParallel(
+    #     model, device_ids=range(torch.cuda.device_count()))
+    #model = torch.nn.DataParallel(model, device_ids=[0])
+    #model.cuda()
 
     # Check if model has custom optimizer / loss
     # modify to adam, modify the learning rate
-    if hasattr(model.module, 'optimizer'):
-        optimizer = model.module.optimizer
-    else:
-        # optimizer = torch.optim.Adam(
-        #     model.parameters(), lr=args.l_rate,weight_decay=5e-4,betas=(0.9,0.999))
-        optimizer = torch.optim.SGD(
-            model.parameters(), lr=args.l_rate,momentum=0.99, weight_decay=5e-4)
-    if hasattr(model.module, 'loss'):
-        print('Using custom loss')
-        loss_fn = model.module.loss
-    else:
-        loss_fn = region_log
+
+    optimizer = torch.optim.SGD(
+        model.parameters(), lr=args.l_rate,momentum=0.90, weight_decay=5e-4)
+
+    loss_fn = l2
     trained=0
     scale=100
 
@@ -100,7 +93,7 @@ def train(args):
             print("Loading model and optimizer from checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
             #model_dict=model.state_dict()  
-            #opt=torch.load('/home/lidong/Documents/RSDEN/RSDEN/exp1/l2/sgd/log/83/rsnet_nyu_best_model.pkl')
+            #opt=torch.load('/home/lidong/Documents/pssm/pssm/exp1/l2/sgd/log/83/rsnet_nyu_best_model.pkl')
             model.load_state_dict(checkpoint['model_state'])
             optimizer.load_state_dict(checkpoint['optimizer_state'])
             #opt=None
@@ -110,7 +103,7 @@ def train(args):
             best_error=checkpoint['error']
             #best_error=5
             #print('load success!')
-            loss_rec=np.load('/home/lidong/Documents/RSDEN/RSDEN/loss.npy')
+            loss_rec=np.load('/home/lidong/Documents/pssm/pssm/loss.npy')
             loss_rec=list(loss_rec)
             loss_rec=loss_rec[:816*trained]
             # for i in range(300):
@@ -128,7 +121,7 @@ def train(args):
 
         print("No checkpoint found at '{}'".format(args.resume))
         print('Initialize from resnet34!')
-        resnet34=torch.load('/home/lidong/Documents/RSDEN/RSDEN/resnet34-333f7ec4.pth')
+        resnet34=torch.load('/home/lidong/Documents/pssm/pssm/resnet34-333f7ec4.pth')
         model_dict=model.state_dict()            
         pre_dict={k: v for k, v in resnet34.items() if k in model_dict}
         model_dict.update(pre_dict)
@@ -146,14 +139,21 @@ def train(args):
         #trained
         print('training!')
         model.train()
-        for i, (images, labels,segments) in enumerate(trainloader):
-            images = Variable(images.cuda())
-            labels = Variable(labels.cuda())
-            segments = Variable(segments.cuda())
+        for i, (left, right,disparity,P,pre1,pre2) in enumerate(trainloader):
+            #with torch.no_grad():
+            #print(left.shape)
+            left = left.cuda(0)
+            right = right.cuda(0)
+            disparity = disparity.cuda(0)
+            P = P.cuda(2)
+            pre1 = pre1.cuda(2)
+            pre2=pre2.cuda(2)
             optimizer.zero_grad()
-            outputs = model(images)
+            #print(P.shape)
+            outputs = model(left,right,P=P,pre1=pre1,pre2=pre2)
+
             #outputs=outputs
-            loss = loss_fn(input=outputs, target=labels,instance=segments)
+            loss = loss_fn(input=outputs, target=disparity)
             # print('training:'+str(i)+':learning_rate'+str(loss.data.cpu().numpy()))
             loss.backward()
             optimizer.step()
@@ -177,7 +177,7 @@ def train(args):
                     opts=dict(title='predict!', caption='predict.'),
                     win=pre_window,
                 )
-                ground=labels.data.cpu().numpy().astype('float32')
+                ground=disparity.data.cpu().numpy().astype('float32')
                 #print(ground.shape)
                 ground = ground[0, :, :]
                 ground = (np.reshape(ground, [480, 640]).astype('float32')-np.min(ground))/(np.max(ground)-np.min(ground))
@@ -251,33 +251,10 @@ def train(args):
                         error_lin[i_val],
                         error_log[i_val],
                         variance[i_val]))                   
-                    # alpha=np.mean(np.log(gt)-np.log(pred))
-                    # dis=np.square(np.log(pred)-np.log(gt)+alpha)
-                    # error_va.append(np.mean(dis)/2)
-                    # dis=np.mean(np.abs(gt-pred))/gt
-                    # error_absrd.append(np.mean(dis))
-                    # dis=np.square(gt-pred)/gt
-                    # error_squrd.append(np.mean(dis))
-                    # thelt=np.where(pred/gt>gt/pred,pred/gt,gt/pred)
-                    # thres1=1.25
 
-                    # thre1.append(np.mean(np.where(thelt<thres1,ones,zeros)))
-                    # thre2.append(np.mean(np.where(thelt<thres1*thres1,ones,zeros)))
-                    # thre3.append(np.mean(np.where(thelt<thres1*thres1*thres1,ones,zeros)))
-                    # #a=thre1[i_val]
-                    # #error_rate.append(np.mean(np.where(dis<0.6,ones,zeros)))
-                    # print("error_lin=%.4f,error_log=%.4f,error_va=%.4f,error_absrd=%.4f,error_squrd=%.4f,thre1=%.4f,thre2=%.4f,thre3=%.4f"%(
-                    #     error_lin[i_val],
-                    #     error_log[i_val],
-                    #     error_va[i_val],
-                    #     error_absrd[i_val],
-                    #     error_squrd[i_val],
-                    #     thre1[i_val],
-                    #     thre2[i_val],
-                    #     thre3[i_val]))
             error=np.mean(error_lin)
             variance=np.mean(variance)
-            #error_rate=np.mean(error_rate)
+
             print("error=%.4f,variance=%.4f"%(error,variance))
 
             if error<= best_error:
@@ -289,9 +266,9 @@ def train(args):
                 torch.save(state, "{}_{}_best_model.pkl".format(
                     args.arch, args.dataset))
                 print('save success')
-            np.save('/home/lidong/Documents/RSDEN/RSDEN//loss.npy',loss_rec)
+            np.save('/home/lidong/Documents/pssm/pssm//loss.npy',loss_rec)
         if epoch%5==0:
-            #best_error = error
+            best_error = error
             state = {'epoch': epoch+1,
                      'model_state': model.state_dict(),
                      'optimizer_state': optimizer.state_dict(), 
@@ -306,9 +283,9 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Hyperparams')
-    parser.add_argument('--arch', nargs='?', type=str, default='rsnet',
+    parser.add_argument('--arch', nargs='?', type=str, default='rstereo',
                         help='Architecture to use [\'region support network\']')
-    parser.add_argument('--dataset', nargs='?', type=str, default='nyu',
+    parser.add_argument('--dataset', nargs='?', type=str, default='sceneflow',
                         help='Dataset to use [\'sceneflow and kitti etc\']')
     parser.add_argument('--img_rows', nargs='?', type=int, default=480,
                         help='Height of the input image')
@@ -316,14 +293,14 @@ if __name__ == '__main__':
                         help='Width of the input image')
     parser.add_argument('--n_epoch', nargs='?', type=int, default=4000,
                         help='# of the epochs')
-    parser.add_argument('--batch_size', nargs='?', type=int, default=4,
+    parser.add_argument('--batch_size', nargs='?', type=int, default=1,
                         help='Batch Size')
     parser.add_argument('--l_rate', nargs='?', type=float, default=1e-3,
                         help='Learning Rate')
     parser.add_argument('--feature_scale', nargs='?', type=int, default=1,
                         help='Divider for # of features to use')
-    parser.add_argument('--resume', nargs='?', type=str, default='/home/lidong/Documents/RSDEN/RSDEN/rsnet_nyu_95_model.pkl',
-                        help='Path to previous saved model to restart from /home/lidong/Documents/RSDEN/RSDEN/rsnet_nyu_30_model.pkl')
+    parser.add_argument('--resume', nargs='?', type=str, default='/home/lidong/Documents/pssm/pssm/rsnet_nyu_95_model.pkl',
+                        help='Path to previous saved model to restart from /home/lidong/Documents/pssm/pssm/rsnet_nyu_30_model.pkl')
     parser.add_argument('--visdom', nargs='?', type=bool, default=True,
                         help='Show visualization(s) on visdom | False by  default')
     args = parser.parse_args()
