@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-26 23:45:59
+# @Last Modified time: 2018-08-27 11:29:37
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -326,26 +326,14 @@ class rstereo(nn.Module):
             min_d=pre1[0,0,i].long()
             max_d=pre1[0,1,i].long()
             object_mask=torch.where(P3==i,one,zero)
-            #x1,y1,x2,y2=crop(object_mask)
             x1,y1,x2,y2,size=pre2[0,i].long()
-            if min_d>y2:
-              min_d=zero.long()
-            else:
-              min_d=torch.max(min_d,zero.long()).long()
-            if max_d<=min_d:
-              max_d=min_d+one.long()*200
-              max_d=max_d.long()
-            max_d=torch.min(max_d,y2).long()
-
-
-
             object_mask=object_mask[0,x1:x2,y1:y2]
-            #print(y1,y2)
             s_mask_o=object_mask*s_mask[0,x1:x2,y1:y2]
             l_mask_o=object_mask*l_mask[0,x1:x2,y1:y2]
-
-            s_l_o=feature[...,x1:x2,y1:y2]*s_mask_o
-            l_l_o=feature[...,x1:x2,y1:y2]*l_mask_o
+            s_match=s_mask_o.nonzero()
+            l_match=l_mask_o.nonzero()
+            s_l_o=feature[...,s_match[:,0],s_match[:,1]]
+            l_l_o=feature[...,l_match[:,0],l_match[:,1]]
             #print(torch.max(min_d,zero).long())
 
 
@@ -354,107 +342,6 @@ class rstereo(nn.Module):
             cost_s=[]
             cost_l=[]
             #ground and sky
-            if (y2-y1)>640:
-              if x2>500:
-                print('ground')
-                cost_l=[]
-                count=0
-                m=x1.item()
-                while(m<x2):
-                  #print(m)
-                  min_d=np.max([count*20-5,0])
-                  max_d=min_d+30
-                  cost_slice=[]
-                  for j in range(min_d,max_d):
-                    if y1-j>0:
-                      l_r_o_t=r_lf[...,m:m+20,y1-j:y2-j]
-                      
-                      cost_slice.append(torch.where(l_mask_o[...,m-x1:m-x1+20,:]==1,cosine_s(l_l_o[...,m-x1:m-x1+20,:],l_r_o_t),zero))
-                    else:
-             
-                      l_r_o_t=torch.cat([r_lf[...,m:m+20,0:j-y1]*zero,r_lf[...,m:m+20,0:y2-j]],-1)
-                      #print(j-y1,y2-j)  
-                      cost_slice.append(torch.where(l_mask_o[...,m-x1:m-x1+20,:]==1,cosine_s(l_l_o[...,m-x1:m-x1+20,:],l_r_o_t),zero))
-                  cost_slice=torch.stack(cost_slice,-1)
-                  if m==x1:
-                    cost_l=cost_slice
-                  else:
-                    cost_l=torch.cat([cost_l,cost_slice],-2)
-                  m+=20
-                  #print(m,x1,m-x1)
-                  count+=1
-                  if m+20>x2:
-                    #m-=20
-                    min_d=np.max([count*20-5,0])
-                    max_d=min_d+30
-                    cost_slice=[]
-                    for j in range(min_d,max_d):
-                      if y1-j>0:
-                        l_r_o_t=r_lf[...,m:,y1-j:y2-j]
-                        cost_slice.append(torch.where(l_mask_o[...,m-x1:m-x1+20,:]==1,cosine_s(l_l_o[...,m-x1:,:],l_r_o_t),zero))
-                      else:
-                          #              
-                          l_r_o_t=torch.cat([r_lf[...,m:,0:j-y1]*zero,r_lf[...,m:,0:y2-j]],-1)
-                          #print(m-x1,l_l_o[...,m-x1:,:].shape) 
-                          cost_slice.append(torch.where(l_mask_o[...,m-x1:m-x1+20,:]==1,cosine_s(l_l_o[...,m-x1:,:],l_r_o_t),zero))
-                    cost_slice=torch.stack(cost_slice,-1)
-                  if count==0:
-                    cost_l=cost_slice
-                  else:
-                    cost_l=torch.cat([cost_l,cost_slice],-2)
-                  break                  
-                cost_volume=cost_l
-              else:
-                print('sky')
-                if x1<10:
-                  cost_l=[]
-                  count=0
-                  m=x1.item()
-                  while(m<x2):
-                    min_d=np.max([count*5-5,0])
-                    max_d=min_d+15
-                    cost_slice=[]
-                    for j in range(min_d,max_d):
-                      if y1-j>0:
-                        l_r_o_t=r_lf[...,m:m+20,y1-j:y2-j]
-                        print(l_mask_o[...,m-x1:m-x1+20,:].shape,l_r_o_t.shape,l_l_o[...,m-x1:m-x1+20,:].shape)
-                        cost_slice.append(torch.where(l_mask_o[...,m-x1:m-x1+20,:]==1,cosine_s(l_l_o[...,m-x1:m-x1+20,:],l_r_o_t),zero))
-                      else:
-               
-                        l_r_o_t=torch.cat([r_lf[...,m:m+20,0:j-y1]*zero,r_lf[...,m:m+20,0:y2-j]],-1)
-                        #print(j-y1,y2-j)  
-                        cost_slice.append(torch.where(l_mask_o[...,m-x1:m-x1+20,:]==1,cosine_s(l_l_o[...,m-x1:m-x1+20,:],l_r_o_t),zero))
-                    cost_slice=torch.stack(cost_slice,-1)
-                    if m==x1:
-                      cost_l=cost_slice
-                    else:
-                      cost_l=torch.cat([cost_l,cost_slice],-2)
-                    m+=20
-                    #print(m,x1,m-x1)
-                    count+=1
-                    if m+20>x2:
-                      #m-=20
-                      min_d=np.max([count*20-5,0])
-                      max_d=min_d+30
-                      cost_slice=[]
-                      for j in range(min_d,max_d):
-                        if y1-j>0:
-                          l_r_o_t=r_lf[...,m:,y1-j:y2-j]
-                          cost_slice.append(torch.where(l_mask_o[...,m-x1:m-x1+20,:]==1,cosine_s(l_l_o[...,m-x1:,:],l_r_o_t),zero))
-                        else:
-                            #              
-                            l_r_o_t=torch.cat([r_lf[...,m:,0:j-y1]*zero,r_lf[...,m:,0:y2-j]],-1)
-                            #print(m-x1,l_l_o[...,m-x1:,:].shape) 
-                            cost_slice.append(torch.where(l_mask_o[...,m-x1:m-x1+20,:]==1,cosine_s(l_l_o[...,m-x1:,:],l_r_o_t),zero))
-                      cost_slice=torch.stack(cost_slice,-1)
-                    if count==0:
-                      cost_l=cost_slice
-                    else:
-                      cost_l=torch.cat([cost_l,cost_slice],-2)
-                    break
-                  cost_volume=cost_l
-              continue
-            #print(i)
             #print(x1,x2,y1,y2,min_d,max_d)
             for j in range(min_d,max_d):
               #print(j)
