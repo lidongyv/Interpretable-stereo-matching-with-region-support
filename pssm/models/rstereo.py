@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-27 22:01:26
+# @Last Modified time: 2018-08-31 22:52:35
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -46,7 +46,7 @@ class BasicBlock(nn.Module):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.gn1 = nn.GroupNorm(group_dim,planes)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.gn2 = nn.GroupNorm(group_dim,planes)
         self.downsample = downsample
@@ -79,38 +79,38 @@ class feature_extraction(nn.Module):
         self.branch1 = nn.Sequential(nn.AvgPool2d((54, 96), stride=(54,96)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
                                      nn.GroupNorm(4,8),
-                                     nn.ReLU(inplace=True))
+                                     nn.LeakyReLU(inplace=True))
 
         self.branch2 = nn.Sequential(nn.AvgPool2d((27, 48), stride=(27,48)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
                                      nn.GroupNorm(4,8),
-                                     nn.ReLU(inplace=True))
+                                     nn.LeakyReLU(inplace=True))
 
         self.branch3 = nn.Sequential(nn.AvgPool2d((36, 64), stride=(36,64)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
                                      nn.GroupNorm(4,8),
-                                     nn.ReLU(inplace=True))
+                                     nn.LeakyReLU(inplace=True))
 
         self.branch4 = nn.Sequential(nn.AvgPool2d((18, 32), stride=(18,32)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
                                      nn.GroupNorm(4,8),
-                                     nn.ReLU(inplace=True))
+                                     nn.LeakyReLU(inplace=True))
         self.branch5 = nn.Sequential(nn.AvgPool2d((9, 16), stride=(9,16)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
                                      nn.GroupNorm(4,8),
-                                     nn.ReLU(inplace=True))
+                                     nn.LeakyReLU(inplace=True))
         self.branch6 = nn.Sequential(nn.AvgPool2d((3, 8), stride=(3,8)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
                                      nn.GroupNorm(4,8),
-                                     nn.ReLU(inplace=True))
+                                     nn.LeakyReLU(inplace=True))
 
 
         self.lastconv = nn.Sequential(nn.Conv2d(80, 64, 3, 1, 1, 1),
                                       nn.GroupNorm(group_dim,64),
-                                      nn.ReLU(inplace=True),
+                                      nn.LeakyReLU(inplace=True),
                                       nn.Conv2d(64, 32, 3, 1, 1, 1),
                                       nn.GroupNorm(group_dim,32),
-                                      nn.ReLU(inplace=True),  
+                                      nn.LeakyReLU(inplace=True),  
                                       )
 
     def _make_layer(self, block, planes, blocks, stride, pad, dilation):
@@ -167,15 +167,15 @@ class feature_extraction2(nn.Module):
         self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1,
                                bias=False,dilation=1)
         self.gn1 = nn.GroupNorm(group_dim,32)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.LeakyReLU(inplace=True)
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1,
                                bias=False,dilation=1)
         self.gn2 = nn.GroupNorm(group_dim,32)
-        self.relu2 = nn.ReLU(inplace=True)
+        self.relu2 = nn.LeakyReLU(inplace=True)
         self.conv3 = nn.Conv2d(32, 32, kernel_size=7, stride=1, padding=6,
                                bias=False,dilation=2)
         self.gn3 = nn.GroupNorm(group_dim,32)
-        self.relu3 = nn.ReLU(inplace=True)
+        self.relu3 = nn.LeakyReLU(inplace=True)
         self.layer1 = self._make_layer(BasicBlock, 32, 1, 1,1,1)
 
     def _make_layer(self, block, planes, blocks, stride, pad, dilation):
@@ -247,27 +247,42 @@ class rstereo(nn.Module):
         self.ss_argmin=ss_argmin()
         # self.refinement_sparse=aggregation_sparse()
         # self.refinement_dense=aggregation_dense()        
-
-    def crop(self,x):
-        index=(x==1).nonzero()
-        return torch.min(index[:,0]),torch.max(index[:,0])+1,torch.min(index[:,1]),torch.max(index[:,1]+1)
-    def cluster(feature,mask):
+    def cluster(self,feature,mask):
+        one=torch.ones(1).cuda(2)
+        zero=torch.zeros(1).cuda(2)
         count=torch.sum(mask)
         mean=torch.sum(torch.sum(feature,dim=-1),dim=-1)/count
-        weights=torch.where(mask==ones,torch.norm(feature-mean,dim=1),zeros)
-        weights=torch.exp(weights/torch.max(weights)).reshape(weights.shape[0],weights.shape[1],1)
+        mean=mean.view(mean.shape[0],mean.shape[1],1,1)
+        # weights=torch.where(mask==one,torch.norm(feature-mean,dim=1),zeros)
+        # weights=torch.exp(weights/torch.max(weights)).reshape(weights.shape[0],weights.shape[1],1)
+        #print(mask.shape,feature.shape,mean.shape)
+        weights=torch.where(mask==one,torch.norm(feature-mean,dim=1),zero)
+        weights=torch.exp(-weights).reshape(weights.shape[0],weights.shape[1],weights.shape[2],1)
         return weights
+    def cluster_volume(self,feature,x,y,n,c,count):
+
+        one=torch.ones(1).cuda(2)
+        zero=torch.zeros(1).cuda(2)
+        cluster_feature=feature[...,x,y].view(...,n,c)
+        mean=torch.sum(cluster_feature,dim=-2)/count
+        mean=mean.view(mean.shape[0],mean.shape[1],1,c)
+        y=y.view(mean.shape[0],mean.shape[1],n,c)
+        weights=torch.where(y>0,torch.norm(cluster_feature-mean,dim=1),zero)
+        weights=torch.where(y>0,torch.exp(-weights),zero)
+        return weights.reshape(mean.shape[0],mean.shape[1],n,c)
+
     def forward(self, l,r,P,pre1,pre2):
         #self.P=P[1,0]
         #0 l to r,1 min,2 max
         #[l_box,r_box,match],[min_d,max_d]
+        start_time=time.time()
         with torch.no_grad():
-          self.pre=pre1
-          self.pre2=pre2
-        P1=P[...,0]
-        P2=P[...,3]
-        P3=P[...,1]
-        P4=P[...,2]
+          self.pre=pre1.cuda(2)
+          self.pre2=pre2.cuda(2)
+        P1=P[...,0].cuda(2)
+        P2=P[...,3].cuda(2)
+        P3=P[...,1].cuda(2)
+        P4=P[...,2].cuda(2)
         #feature extraction
         l_mask=P2-P1
         s_mask=P1
@@ -309,122 +324,74 @@ class rstereo(nn.Module):
         #feature=torch.masked_select(l_lf,l_mask)+torch.masked_select(l_sf,s_mask)
         feature=l_lf*l_mask+l_sf*s_mask
         feature=torch.where((l_mask+s_mask)>0,feature,l_lf)
-        with torch.no_grad():
-          s_match=s_mask.nonzero()
-        s_feature=l_sf[...,s_match[:,0],s_match[:,1]]
-        with torch.no_grad():
-          l_match=l_mask.nonzero()
-        l_feature=l_lf[...,l_match[:,0],l_match[:,1]]
 
-        # start_time=time.time()
-        # # #0.04s
-        # sy_match=s_match[:,1]
-        # sx_match=s_match[:,0]
-        # with torch.no_grad():
-        #   # for i in range(1,192):
-        #   #   sy_match=torch.cat([sy_match,s_match[:,1]-i],0)
-        #   d=192
-        #   sx_match=sx_match.repeat(1,d)
-        #   sy_match=sy_match.repeat(1,d)
-        #   #print(sy_match.shape)
-        #   sy_match-=torch.arange(0,d).repeat(s_match.shape[0],1).transpose(1,0).contiguous().view_as(sy_match).cuda(2)
-        # #192,0.09s,30,0.01
-        # s_r_o_t=r_sf[...,sx_match,sy_match].reshape(1,32,s_feature.shape[-1],d)
-        # s_feature=s_feature.repeat(1,1,1,d).reshape(1,32,s_feature.shape[-1],d)
-        # print(s_feature.shape,s_r_o_t.shape)
-        # cost_volume.append(torch.where(sy_match.reshape(1,s_feature.shape[-2],d)>=0,cosine_s(s_feature,s_r_o_t),zero))
-        # ly_match=l_match[:,1]
-        # lx_match=l_match[:,0]
-        # with torch.no_grad():
-        #   # for i in range(1,192):
-        #   #   sy_match=torch.cat([sy_match,s_match[:,1]-i],0)
-        #   d=192
-        #   lx_match=lx_match.repeat(1,d)
-        #   ly_match=ly_match.repeat(1,d)
-        #   #print(sy_match.shape)
-        #   ly_match-=torch.arange(0,d).repeat(l_match.shape[0],1).transpose(1,0).contiguous().view_as(ly_match).cuda(2)
-        # #192,0.09s,30,0.01,lf0.19
-        # l_r_o_t=r_lf[...,lx_match,ly_match].reshape(1,32,l_feature.shape[-1],d)
-        # l_feature=l_feature.repeat(1,1,1,d).reshape(1,32,l_feature.shape[-1],d)
-        # #print(s_feature.shape,s_r_o_t.shape)
-        # cost_volume.append(torch.where(ly_match.reshape(1,l_feature.shape[-2],d)>=0,cosine_s(l_feature,l_r_o_t),zero))
-        # #0.0003
-        # #s_r_o_t=r_sf[...,s_match[:,0],s_match[:,1]]
-        # #1,32,n
-        # #print(time.time()-start_time)
-        # #print(s_match.shape)
-        # #time 10
-        # # for i in range(s_match.shape[0]):
-        # #   min_d=torch.max(s_match[i,1]-300,zero.long())
-        # #   #print(min_d)
-        # #   s_r_o_t=r_sf[...,s_match[i,0],min_d:s_match[i,1]]
+        s_feature=l_sf[...,s_x,s_y]
+        s_r_o_t=r_sf[...,s_x,s_y]
+        s_cost=torch.where(s_y>=0,cosine_s(s_feature,s_r_o_t),zero)
+        l_feature=l_lf[...,l_x,l_y]
+        l_r_o_t=r_lf[...,l_x,l_y]
+        l_cost=torch.where(s_y>=0,cosine_s(l_feature,l_r_o_t),zero)
+
+        #0.0003
+        #s_r_o_t=r_sf[...,s_match[:,0],s_match[:,1]]
+        #1,32,n
+        #print(time.time()-start_time)
+        #print(s_match.shape)
+        #time 10
+        # for i in range(s_match.shape[0]):
+        #   min_d=torch.max(s_match[i,1]-300,zero.long())
+        #   #print(min_d)
+        #   s_r_o_t=r_sf[...,s_match[i,0],min_d:s_match[i,1]]
           
-        # #   a=s_feature[...,i].reshape(1,32,1)
-        # #   #print(a.shape,s_r_o_t.shape)
-        # #   cost_volume.append(torch.where(s_match[i,1]-300>=0,cosine_s(a,s_r_o_t),zero))
+        #   a=s_feature[...,i].reshape(1,32,1)
+        #   #print(a.shape,s_r_o_t.shape)
+        #   cost_volume.append(torch.where(s_match[i,1]-300>=0,cosine_s(a,s_r_o_t),zero))
 
-        # #time 0.23,192,0.035,30, the number of the match points won't influence the time,only the iteration
+        #time 0.23,192,0.035,30, the number of the match points won't influence the time,only the iteration
 
-        # for i in range(30):
-        #   s_r_o_t=r_sf[...,s_match[:,0],s_match[:,1]-i]
-        #   #s_r_o_t=torch.take(r_sf,[...,s_match[:,0],s_match[:,1]-i])
-        #   cost_volume.append(torch.where(s_match[:,1]-i>=0,cosine_s(s_feature,s_r_o_t),zero))
-        #   l_r_o_t=r_sf[...,l_match[:,0],l_match[:,1]-i]
-        #   cost_volume.append(torch.where(l_match[:,1]-i>=0,cosine_s(l_feature,l_r_o_t),zero))          
-        #cost_volume=torch.stack(cost_volume)
-        # print(torch.cuda.memory_allocated(2))
-        # print(time.time()-start_time)
-        # time.sleep(100)
-        
-        #promotion
-        #we can segment with bounding box and divide the whole image into many parts
-        #each single bounding box will be managed through network not the whole image
-        #matching cost computation
-        count=0
-        start_time=time.time()
-        for i in range(torch.max(P3).type(torch.int32)+1):
-            #ground 0-270, sky 0-40
-            #0.19
-            min_d=pre1[0,0,i].long()
-            max_d=pre1[0,1,i].long()
-            #object_mask=torch.where(P3==i,one,zero)
-            x1,y1,x2,y2,size=pre2[0,i].long()
-            object_mask=P3[0,x1:x2,y1:y2]
-            object_mask=torch.where(object_mask==i,one,zero)
-            s_mask_o=object_mask*s_mask[0,x1:x2,y1:y2]
-            l_mask_o=object_mask*l_mask[0,x1:x2,y1:y2]
-            s_match=s_mask_o.nonzero()
-            l_match=l_mask_o.nonzero()
-            if s_match.shape[0]==0:
-              s_match=object_mask.nonzero()
-            if l_match.shape[0]==0:
-              l_match=object_mask.nonzero()
-            s_l_o=feature[...,s_match[:,0],s_match[:,1]]
-            l_l_o=feature[...,l_match[:,0],l_match[:,1]]
-            cost_s=[]
-            cost_l=[]
-            sy_match=s_match[:,1]
-            sx_match=s_match[:,0]
-            print(sy_match.shape)
-            with torch.no_grad():
-              d=max_d-min_d
-              print(d)
-              sx_match=sx_match.repeat(1,d)
-              sy_match=sy_match.repeat(1,d)
-              sy_match-=torch.arange(min_d,max_d).repeat(s_match.shape[0],1).transpose(1,0).contiguous().view_as(sy_match).cuda(2)
-            s_r_o_t=r_sf[...,sx_match,sy_match].reshape(1,32,s_l_o.shape[-1],d)
-            s_l_o=s_l_o.repeat(1,1,1,d).reshape(1,32,s_l_o.shape[-1],d)
-            cost_s.append(torch.where(sy_match.reshape(1,s_l_o.shape[-2],d)>=0,cosine_s(s_l_o,s_r_o_t),zero))
-
-
-            
-
-            
-            #cost_volume=cost_s+cost_l
-            #print(torch.cuda.memory_allocated(2)/1e+6)
-            #time.sleep(30)
+        for i in range(30):
+          s_r_o_t=r_sf[...,s_match[:,0],s_match[:,1]-i]
+          #s_r_o_t=torch.take(r_sf,[...,s_match[:,0],s_match[:,1]-i])
+          cost_volume.append(torch.where(s_match[:,1]-i>=0,cosine_s(s_feature,s_r_o_t),zero))
+          l_r_o_t=r_sf[...,l_match[:,0],l_match[:,1]-i]
+          cost_volume.append(torch.where(l_match[:,1]-i>=0,cosine_s(l_feature,l_r_o_t),zero))          
+        cost_volume=torch.stack(cost_volume)
+        print(torch.cuda.memory_allocated(2))
         print(time.time()-start_time)
         time.sleep(100)
+
+        # cost_s=[]
+        # cost_l=[]
+        # for m in range(10):
+        count=0
+        start_time=time.time()
+
+        print(time.time()-start_time)
+        #print(time.time()-start_time)  
+        time.sleep(100)            
+            # #ss_argmin
+            # disparity[...,x1:x2,y1:y2]=ss_argmin(cost_volume,min_d,max_d)
+            # #refinement
+            # refine=torch.zeros_like(disparity)[...,x1:x2,y1:y2]
+            # for j in range(min_r,max_r+1):
+            #     plane_mask=torch.where(object_r==j,one,zero)[x1:x2,y1:y2]
+            #     xp1,xp2,yp1,yp2=crop(plane_mask)
+            #     plane_mask=plane_mask[xp1:xp2,yp1:yp2]
+            #     s_plane_mask=plane_mask*s_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
+            #     l_plane_mask=plane_mask*l_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
+            #     plane_mask=plane_mask-torch.where(s_plane_mask+l_plane_mask>0,one,zero)
+            #     plane=disparity[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2]*plane_mask
+            #     s_weights=self.cluster(l_sf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],s_plane_mask)
+            #     s_cost=torch.sum(torch.sum(plane*s_weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(s_weights)
+            #     l_weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],l_plane_mask)
+            #     l_cost=torch.sum(torch.sum(plane*l_weights,-2),-2)/torch.sum(l_weights)
+            #     weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],plane_mask)
+            #     costs=torch.sum(torch.sum(plane*weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(weights)
+            #     plane=torch.where(s_plane_mask==1,s_cost*s_weights,plane)
+            #     plane=torch.where(l_plane_mask==1,l_cost*l_weights,plane)
+            #     plane=torch.where(plane_mask==1,cost*weights,plane)
+            #     disparity[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2]=plane
+            
         return cost_volume
 
 

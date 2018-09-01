@@ -91,7 +91,7 @@ class conv2DBatchNormRelu(nn.Module):
 
         self.cbr_unit = nn.Sequential(conv_mod,
                                       nn.BatchNorm2d(int(n_filters)),
-                                      nn.ReLU(inplace=True),)
+                                      nn.LeakyReLU(inplace=True),)
 
     def forward(self, inputs):
         outputs = self.cbr_unit(inputs)
@@ -110,7 +110,7 @@ class conv2DGroupNormRelu(nn.Module):
 
         self.cbr_unit = nn.Sequential(conv_mod,
                                       nn.GroupNorm(group_dim,int(n_filters)),
-                                      nn.ReLU(inplace=True),)
+                                      nn.LeakyReLU(inplace=True),)
 
     def forward(self, inputs):
         outputs = self.cbr_unit(inputs)
@@ -147,7 +147,7 @@ class conv2DRelu(nn.Module):
                                  padding=padding, stride=stride, bias=bias, dilation=1)
 
         self.cbr_unit = nn.Sequential(conv_mod,
-                                      nn.ReLU(inplace=True),)
+                                      nn.LeakyReLU(inplace=True),)
 
     def forward(self, inputs):
         outputs = self.cbr_unit(inputs)
@@ -159,7 +159,7 @@ class deconv2DBatchNormRelu(nn.Module):
         self.dcbr_unit = nn.Sequential(nn.ConvTranspose2d(int(in_channels), int(n_filters), kernel_size=k_size,
                                                 padding=padding, stride=stride, bias=bias,output_padding=output_padding),
                                  nn.BatchNorm2d(int(n_filters)),
-                                 nn.ReLU(inplace=True),)
+                                 nn.LeakyReLU(inplace=True),)
 
     def forward(self, inputs):
         outputs = self.dcbr_unit(inputs)
@@ -171,7 +171,7 @@ class up2DGroupNormRelu(nn.Module):
         self.dcbr_unit = nn.Sequential(conv2DGroupNormRelu(int(in_channels), int(n_filters), k_size=k_size,
                                                 padding=padding, stride=stride, bias=bias),
                                  nn.GroupNorm(group_dim,int(n_filters)),
-                                 nn.ReLU(inplace=True),)
+                                 nn.LeakyReLU(inplace=True),)
 
     def forward(self, inputs):
         h, w = inputs.shape[-2:]
@@ -186,7 +186,7 @@ class deconv2DGroupNormRelu(nn.Module):
         self.dcbr_unit = nn.Sequential(nn.ConvTranspose2d(int(in_channels), int(n_filters), kernel_size=k_size,
                                                 padding=padding, stride=stride, bias=bias,output_padding=output_padding),
                                  nn.GroupNorm(group_dim,int(n_filters)),
-                                 nn.ReLU(inplace=True),)
+                                 nn.LeakyReLU(inplace=True),)
 
     def forward(self, inputs):
         outputs = self.dcbr_unit(inputs)
@@ -198,7 +198,7 @@ class deconv2DRelu(nn.Module):
         self.dcbr_unit = nn.Sequential(nn.ConvTranspose2d(int(in_channels), int(n_filters), kernel_size=k_size,
                                                 padding=padding, stride=stride, bias=bias,output_padding=output_padding),
                                  
-                                 nn.ReLU(inplace=True),)
+                                 nn.LeakyReLU(inplace=True),)
 
     def forward(self, inputs):
         outputs = self.dcbr_unit(inputs)
