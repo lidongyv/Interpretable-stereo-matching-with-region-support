@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-06-20 14:37:27
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-10 21:32:24
+# @Last Modified time: 2018-09-01 16:21:53
 
 import cv2
 import numpy as np
@@ -214,13 +214,14 @@ for f in range(length):
         #print(time.time()-start)
         i_region=0
         for j in range(min,max+1):
-            i_region+=1
+            
             region_b=np.where(np.logical_and(region>=j,region<j+1),1.0,0.0)
             edge_size=np.sum(region_b)
             box=np.argwhere(region_b==1)
 
 
-            if box.shape[0]>0:       
+            if box.shape[0]>0:
+                i_region+=1    
                 P3[rx_min:rx_max+1,ry_min:ry_max+1]+=region_b*i_region
        
                 #P4

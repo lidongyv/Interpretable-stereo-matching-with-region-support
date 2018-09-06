@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-31 22:52:35
+# @Last Modified time: 2018-09-05 23:33:20
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -204,29 +204,7 @@ class feature_extraction2(nn.Module):
 
         return output
 
-class ss_argmin(nn.Module):
-    def __init__(self):
-        super(ss_argmin, self).__init__()
-        self.softmax = nn.Softmax(dim=-1)
 
-
-
-    def forward(self,x,min,max):
-        one=torch.ones(1)
-        zero=torch.zeros(1)
-        x=self.softmax(x)
-        index=torch.ones_like(x)*torch.range(min,max)
-        disparity= torch.sum(x*index,dim=-1)
-        v,i=torch.topk(x,k=1,dim=-1)
-        mask_1=torch.squeeze(torch.where(v>0.7,one,zero))
-        v,i=torch.topk(x,k=5,dim=-1)
-        v_sum=torch.sum(v,-1)
-        mask_2=torch.squeeze(torch.where(v_s>0.7,one,zero))
-        i_dis=torch.max(i,-1)[0]-torch.min(i,-1)[0]
-        mask_3=torch.squeeze(torch.where(i_dis<6,one,zero))
-        mask=mask_1+mask_2*mask_3
-        mask=torch.where(mask>0,one,zero)
-        return disparity*mask
 
 
 
@@ -242,47 +220,34 @@ class rstereo(nn.Module):
         super(rstereo, self).__init__()
         self.feature_extraction=feature_extraction().cuda(0)
         self.feature_extraction2=feature_extraction2().cuda(0)
-        # self.aggregation_sparse=aggregation_sparse()
-        # self.aggregation_dense=aggregation_dense()   
-        self.ss_argmin=ss_argmin()
-        # self.refinement_sparse=aggregation_sparse()
-        # self.refinement_dense=aggregation_dense()        
-    def cluster(self,feature,mask):
-        one=torch.ones(1).cuda(2)
-        zero=torch.zeros(1).cuda(2)
-        count=torch.sum(mask)
-        mean=torch.sum(torch.sum(feature,dim=-1),dim=-1)/count
-        mean=mean.view(mean.shape[0],mean.shape[1],1,1)
-        # weights=torch.where(mask==one,torch.norm(feature-mean,dim=1),zeros)
-        # weights=torch.exp(weights/torch.max(weights)).reshape(weights.shape[0],weights.shape[1],1)
-        #print(mask.shape,feature.shape,mean.shape)
-        weights=torch.where(mask==one,torch.norm(feature-mean,dim=1),zero)
-        weights=torch.exp(-weights).reshape(weights.shape[0],weights.shape[1],weights.shape[2],1)
+        self.softmax= nn.Softmax(dim=-1)
+    def ss_argmin(self,x,index):
+        one=torch.ones(1)
+        zero=torch.zeros(1)
+        x=self.softmax(x)
+        disparity= torch.sum(x*index.unsqueeze(0),dim=-1)
+        return disparity     
+    def cluster_vector(self,feature,x,y):
+        one=torch.ones(1).cuda(1)
+        zero=torch.zeros(1).cuda(1)
+        cluster_feature=feature[...,x,y]
+        mean=torch.sum(cluster_feature,dim=-1)/x.shape[0]
+        mean=mean.view(cluster_feature.shape[0],cluster_feature.shape[1],1)
+        #print(mean.shape)
+        weights=torch.norm(cluster_feature-mean,dim=1)
+        weights=torch.exp(-weights)
         return weights
-    def cluster_volume(self,feature,x,y,n,c,count):
-
-        one=torch.ones(1).cuda(2)
-        zero=torch.zeros(1).cuda(2)
-        cluster_feature=feature[...,x,y].view(...,n,c)
-        mean=torch.sum(cluster_feature,dim=-2)/count
-        mean=mean.view(mean.shape[0],mean.shape[1],1,c)
-        y=y.view(mean.shape[0],mean.shape[1],n,c)
-        weights=torch.where(y>0,torch.norm(cluster_feature-mean,dim=1),zero)
-        weights=torch.where(y>0,torch.exp(-weights),zero)
-        return weights.reshape(mean.shape[0],mean.shape[1],n,c)
-
-    def forward(self, l,r,P,pre1,pre2):
+    def forward(self, l,r,P,pre,matching,aggregation):
         #self.P=P[1,0]
         #0 l to r,1 min,2 max
         #[l_box,r_box,match],[min_d,max_d]
         start_time=time.time()
         with torch.no_grad():
-          self.pre=pre1.cuda(2)
-          self.pre2=pre2.cuda(2)
-        P1=P[...,0].cuda(2)
-        P2=P[...,3].cuda(2)
-        P3=P[...,1].cuda(2)
-        P4=P[...,2].cuda(2)
+          self.pre=pre.cuda(1)
+        P1=P[...,0].cuda(1)
+        P2=P[...,3].cuda(1)
+        P3=P[...,1].cuda(1)
+        P4=P[...,2].cuda(1)
         #feature extraction
         l_mask=P2-P1
         s_mask=P1
@@ -299,7 +264,7 @@ class rstereo(nn.Module):
         #print(torch.cuda.memory_allocated(2))
         #the cuda won't copy the volume to the new gpu
         # a=l_lf.cuda(1)
-        # b=l_lf.cuda(2)
+        # b=l_lf.cuda(1)
         # c=l_sf.cuda(3)
         r_sf=self.feature_extraction2(r)
         r_lf=self.feature_extraction(r_sf)
@@ -309,89 +274,101 @@ class rstereo(nn.Module):
         #print(torch.cuda.memory_allocated(2))
         #reshape the mask to batch and channel
 
-        disparity=torch.zeros([540,960]).cuda(2)
-        one=torch.ones(1).cuda(2)
-        zero=torch.zeros(1).cuda(2)
-        cost_volume=[]
+        disparity=torch.zeros([540,960]).cuda(0)
+        one=torch.ones(1).cuda(1)
+        zero=torch.zeros(1).cuda(1)
+        #cost_volume=[]
         #5710
         #print(value)
-        l_lf=l_lf.cuda(2)
-        r_lf=r_lf.cuda(2)
-        r_sf=r_sf.cuda(2)
-        l_sf=l_sf.cuda(2)
+        l_lf=l_lf.cuda(1)
+        r_lf=r_lf.cuda(1)
+        r_sf=r_sf.cuda(1)
+        l_sf=l_sf.cuda(1)
         #985
         #feature=torch.masked_select(l_sf,s_mask)
         #feature=torch.masked_select(l_lf,l_mask)+torch.masked_select(l_sf,s_mask)
-        feature=l_lf*l_mask+l_sf*s_mask
-        feature=torch.where((l_mask+s_mask)>0,feature,l_lf)
+        # feature=l_lf*l_mask+l_sf*s_mask
+        # feature=torch.where((l_mask+s_mask)>0,feature,l_lf)
 
-        s_feature=l_sf[...,s_x,s_y]
-        s_r_o_t=r_sf[...,s_x,s_y]
-        s_cost=torch.where(s_y>=0,cosine_s(s_feature,s_r_o_t),zero)
-        l_feature=l_lf[...,l_x,l_y]
-        l_r_o_t=r_lf[...,l_x,l_y]
-        l_cost=torch.where(s_y>=0,cosine_s(l_feature,l_r_o_t),zero)
-
-        #0.0003
-        #s_r_o_t=r_sf[...,s_match[:,0],s_match[:,1]]
-        #1,32,n
-        #print(time.time()-start_time)
-        #print(s_match.shape)
-        #time 10
-        # for i in range(s_match.shape[0]):
-        #   min_d=torch.max(s_match[i,1]-300,zero.long())
-        #   #print(min_d)
-        #   s_r_o_t=r_sf[...,s_match[i,0],min_d:s_match[i,1]]
-          
-        #   a=s_feature[...,i].reshape(1,32,1)
-        #   #print(a.shape,s_r_o_t.shape)
-        #   cost_volume.append(torch.where(s_match[i,1]-300>=0,cosine_s(a,s_r_o_t),zero))
-
-        #time 0.23,192,0.035,30, the number of the match points won't influence the time,only the iteration
-
-        for i in range(30):
-          s_r_o_t=r_sf[...,s_match[:,0],s_match[:,1]-i]
-          #s_r_o_t=torch.take(r_sf,[...,s_match[:,0],s_match[:,1]-i])
-          cost_volume.append(torch.where(s_match[:,1]-i>=0,cosine_s(s_feature,s_r_o_t),zero))
-          l_r_o_t=r_sf[...,l_match[:,0],l_match[:,1]-i]
-          cost_volume.append(torch.where(l_match[:,1]-i>=0,cosine_s(l_feature,l_r_o_t),zero))          
-        cost_volume=torch.stack(cost_volume)
-        print(torch.cuda.memory_allocated(2))
-        print(time.time()-start_time)
-        time.sleep(100)
 
         # cost_s=[]
         # cost_l=[]
         # for m in range(10):
         count=0
-        start_time=time.time()
-
-        print(time.time()-start_time)
-        #print(time.time()-start_time)  
-        time.sleep(100)            
-            # #ss_argmin
-            # disparity[...,x1:x2,y1:y2]=ss_argmin(cost_volume,min_d,max_d)
-            # #refinement
-            # refine=torch.zeros_like(disparity)[...,x1:x2,y1:y2]
-            # for j in range(min_r,max_r+1):
-            #     plane_mask=torch.where(object_r==j,one,zero)[x1:x2,y1:y2]
-            #     xp1,xp2,yp1,yp2=crop(plane_mask)
-            #     plane_mask=plane_mask[xp1:xp2,yp1:yp2]
-            #     s_plane_mask=plane_mask*s_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
-            #     l_plane_mask=plane_mask*l_mask[x1:x2,y1:y2][xp1:xp2,yp1:yp2]
-            #     plane_mask=plane_mask-torch.where(s_plane_mask+l_plane_mask>0,one,zero)
-            #     plane=disparity[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2]*plane_mask
-            #     s_weights=self.cluster(l_sf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],s_plane_mask)
-            #     s_cost=torch.sum(torch.sum(plane*s_weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(s_weights)
-            #     l_weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],l_plane_mask)
-            #     l_cost=torch.sum(torch.sum(plane*l_weights,-2),-2)/torch.sum(l_weights)
-            #     weights=self.cluster(l_lf[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2],plane_mask)
-            #     costs=torch.sum(torch.sum(plane*weights,-2,keepdim=True),-3,keepdim=True)/torch.sum(weights)
-            #     plane=torch.where(s_plane_mask==1,s_cost*s_weights,plane)
-            #     plane=torch.where(l_plane_mask==1,l_cost*l_weights,plane)
-            #     plane=torch.where(plane_mask==1,cost*weights,plane)
-            #     disparity[...,x1:x2,y1:y2][...,xp1:xp2,yp1:yp2]=plane
+        #start_time=time.time()
+        #with torch.no_grad():
+        for z in range(1):
+          start_time=time.time()
+          for i in range(torch.max(P3).type(torch.int32)):
+            x1,y1,x2,y2,size=pre[0,i].long()
+            max_d=torch.max(matching[-1][i])
+            min_d=torch.min(matching[-1][i])
             
-        return cost_volume
+            cost_volume=torch.zeros(x2-x1,y2-y1,max_d-min_d+1).cuda(1)
+            #ground 0-270, sky 0-40
+            #intial 0.46, after 0.18,volume 0.3
+            #cost computation intial 0.20,after 0.14,volume 0.3
+            if torch.max(matching[0][i])>0:
+              s_feature=l_sf[...,x1:x2,y1:y2][...,matching[0][i],matching[1][i]]
+              s_r_y=torch.max(matching[1][i]-matching[2][i],-torch.ones_like(matching[2][i]))
+              #print(s_r_y)
+              s_r_o_t=r_sf[...,x1:x2,y1:y2][...,matching[0][i],s_r_y]
+              #cost_volume[matching[0][i],matching[1][i],matching[2][i]-min_d]=torch.where(s_r_y>=0,cosine_s(s_feature,s_r_o_t),zero)
+              s_cost=torch.where(s_r_y>=0,cosine_s(s_feature,s_r_o_t),zero)
+              d=matching[2][i]-min_d
+              cost_volume[matching[0][i],matching[1][i],d]=s_cost
+            if torch.max(matching[3][i])>0:
+              l_feature=l_lf[...,x1:x2,y1:y2][...,matching[3][i],matching[4][i]]
+              l_r_y=torch.max(matching[4][i]-matching[5][i],-torch.ones_like(matching[5][i]))
+              l_r_o_t=r_lf[...,x1:x2,y1:y2][...,matching[3][i],l_r_y]
+              #print(min_d,torch.min(matching[2][i]),torch.min(matching[3][i]),torch.min(matching[4][i]))
+              d=matching[5][i]-min_d
+              #cost_volume[matching[3][i],matching[4][i],d]=torch.where(l_r_y>=0,cosine_s(l_feature,l_r_o_t),zero)
+              l_cost=torch.where(l_r_y>=0,cosine_s(l_feature,l_r_o_t),zero)
+              cost_volume[matching[3][i],matching[4][i],d]=l_cost
+            plane=aggregation[0][i]
+            plane_num=aggregation[1][i]
+            s_plane=aggregation[2][i]
+            s_plane_num=aggregation[3][i]
+            l_plane=aggregation[4][i]
+            l_plane_num=aggregation[5][i]
+            for j in range(len(plane)):
+              if plane_num[0][j]<=1:
+                continue
+              #print(s_plane_num[j])
+              if s_plane_num[0][j]>1:
+                s_weights=self.cluster_vector(l_sf[...,x1:x2,y1:y2], s_plane[j][0][0], s_plane[j][0][1]).squeeze().unsqueeze(1)
+                mean_cost=torch.sum(cost_volume[s_plane[j][0][0], s_plane[j][0][1],:]*s_weights,0,keepdim=True)/torch.sum(s_weights)
+                cost_volume[s_plane[j][0][0], s_plane[j][0][1],:]=mean_cost*s_weights+(1-s_weights)*cost_volume[s_plane[j][0][0], s_plane[j][0][1],:]
+              #disparity[x1:x2,y1:y2][s_plane[j][0][0], s_plane[j][0][1]]=self.ss_argmin(cost_volume[s_plane[j][0][0], s_plane[j][0][1],:],matching[-1][i].float())
+              if l_plane_num[0][j]>1:
+                l_weights=self.cluster_vector(l_lf[...,x1:x2,y1:y2], l_plane[j][0][0], l_plane[j][0][1]).squeeze().unsqueeze(1)
+                mean_cost=torch.sum(cost_volume[l_plane[j][0][0], l_plane[j][0][1],:]*l_weights,0,keepdim=True)/torch.sum(l_weights)
+                cost_volume[l_plane[j][0][0], l_plane[j][0][1],:]=mean_cost*l_weights+(1-l_weights)*cost_volume[l_plane[j][0][0], l_plane[j][0][1],:]
+              #disparity[x1:x2,y1:y2][l_plane[j][0][0], l_plane[j][0][1]]=self.ss_argmin(cost_volume[l_plane[j][0][0], l_plane[j][0][1],:],matching[-1][i].float())                
+              weights=self.cluster_vector(torch.cat([l_sf[...,x1:x2,y1:y2],l_lf[...,x1:x2,y1:y2]],-3), \
+                                        plane[j][0][0], plane[j][0][1]).squeeze().unsqueeze(1)
+              mean_cost=torch.sum(cost_volume[plane[j][0][0], plane[j][0][1],:]*weights,0,keepdim=True)/torch.sum(weights) \
+                        #/torch.sum(torch.where(cost_volume[plane[j][0][0], plane[j][0][1],0]==0,zero,weights))
+              cost_volume[plane[j][0][0], plane[j][0][1],:]=mean_cost*weights+(1-weights)*cost_volume[plane[j][0][0], plane[j][0][1],:]
+
+              # weights=self.cluster_vector(torch.cat([l_sf[...,x1:x2,y1:y2],l_lf[...,x1:x2,y1:y2]],-3), \
+              #                              plane[j][0][0], plane[j][0][1]).squeeze().unsqueeze(1)
+              # for m in range(plane[j][0][0].shape):
+              #   if disparity[x1:x2,y1:y2][plane[j][0][0][m],plane[j][0][1][m]]==zero:
+              #       disparity[x1:x2,y1:y2][plane[j][0][0][m],plane[j][0][1][m]]=weights-weights[m]
+            #ss_argmin
+            # disparity[matching[-5][i],matching[-4][i]]=self.ss_argmin(cost_volume[matching[-5][i],matching[-4][i],:],matching[-1][i].float())
+            # disparity[matching[-3][i],matching[-2][i]]=self.ss_argmin(cost_volume[matching[-3][i],matching[-2][i],:],matching[-1][i].float())
+              disparity[plane[j][0][0], plane[j][0][1],]=self.ss_argmin(cost_volume[plane[j][0][0], plane[j][0][1],:].cuda(0),matching[-1][i].float().cuda(0)).cuda(0)
+          # print(time.time()-start_time)
+          # time.sleep(100)
+
+          print(torch.max(disparity),torch.min(disparity))
+          
+
+
+            
+        return disparity
 
 

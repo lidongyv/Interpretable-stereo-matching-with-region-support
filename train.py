@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-08-31 10:22:49
+# @Last Modified time: 2018-09-05 23:34:37
 import sys
 import torch
 import visdom
@@ -41,9 +41,9 @@ def train(args):
 
     n_classes = t_loader.n_classes
     trainloader = data.DataLoader(
-        t_loader, batch_size=args.batch_size, num_workers=1, shuffle=False)
+        t_loader, batch_size=args.batch_size, num_workers=0, shuffle=False)
     valloader = data.DataLoader(
-        v_loader, batch_size=args.batch_size, num_workers=1)
+        v_loader, batch_size=args.batch_size, num_workers=0)
 
     # Setup Metrics
     running_metrics = runningScore(n_classes)
@@ -139,54 +139,62 @@ def train(args):
         #trained
         print('training!')
         model.train()
-        for i, (left, right,disparity,P,pre1,pre2) in enumerate(trainloader):
+        for i, (left, right,disparity,P,pre_match,matching,aggregation) in enumerate(trainloader):
             #with torch.no_grad():
             #print(left.shape)
             left = left.cuda(0)
             right = right.cuda(0)
             disparity = disparity.cuda(0)
-            P = P.cuda(2)
-            pre1 = pre1.cuda(2)
-            pre2=pre2.cuda(2)
+            P = P.cuda(1)
+            pre_match=pre_match.cuda(1)
+            for m in range(len(matching)):
+                for n in range(len(matching[m])):
+                    matching[m][n]=matching[m][n].cuda(1)
+            for m in range(len(aggregation)):
+                for n in range(len(aggregation[m])):
+                    for o in range(len(aggregation[m][n])):
+                        aggregation[m][n][o]=aggregation[m][n][o].cuda(1)
+
+            #plane = plane.cuda(1)
+            #s_plane=s_plane.cuda(1)
+            #l_plane=l_plane.cuda(1)
             optimizer.zero_grad()
             #print(P.shape)
-            outputs = model(left,right,P=P,pre1=pre1,pre2=pre2)
+            outputs = model(left,right,P=P,pre=pre_match,matching=matching,aggregation=aggregation)
 
             #outputs=outputs
-            loss = loss_fn(input=outputs, target=disparity)
+            loss = l1(input=outputs, target=disparity)
             # print('training:'+str(i)+':learning_rate'+str(loss.data.cpu().numpy()))
             loss.backward()
             optimizer.step()
-            #torch.cuda.empty_cache()
-            # print(torch.Tensor([loss.data[0]]).unsqueeze(0).cpu())
-            #print(loss.item()*torch.ones(1).cpu())
-            #nyu2_train:246,nyu2_all:816
-            if args.visdom:
-                vis.line(
-                    X=torch.ones(1).cpu() * i+torch.ones(1).cpu() *(epoch-trained)*816,
-                    Y=loss.item()*torch.ones(1).cpu(),
-                    win=loss_window,
-                    update='append')
-                pre = outputs.data.cpu().numpy().astype('float32')
-                pre = pre[0, :, :, :]
-                #pre = np.argmax(pre, 0)
-                pre = (np.reshape(pre, [480, 640]).astype('float32')-np.min(pre))/(np.max(pre)-np.min(pre))
-                #pre = pre/np.max(pre)
-                # print(type(pre[0,0]))
-                vis.image(
-                    pre,
-                    opts=dict(title='predict!', caption='predict.'),
-                    win=pre_window,
-                )
-                ground=disparity.data.cpu().numpy().astype('float32')
-                #print(ground.shape)
-                ground = ground[0, :, :]
-                ground = (np.reshape(ground, [480, 640]).astype('float32')-np.min(ground))/(np.max(ground)-np.min(ground))
-                vis.image(
-                    ground,
-                    opts=dict(title='ground!', caption='ground.'),
-                    win=ground_window,
-                )
+            torch.cuda.empty_cache()
+
+            # if args.visdom:
+            #     vis.line(
+            #         X=torch.ones(1).cpu() * i+torch.ones(1).cpu() *(epoch-trained)*816,
+            #         Y=loss.item()*torch.ones(1).cpu(),
+            #         win=loss_window,
+            #         update='append')
+            #     pre = outputs.data.cpu().numpy().astype('float32')
+            #     pre = pre[0, :, :, :]
+            #     #pre = np.argmax(pre, 0)
+            #     pre = (np.reshape(pre, [480, 640]).astype('float32')-np.min(pre))/(np.max(pre)-np.min(pre))
+            #     #pre = pre/np.max(pre)
+            #     # print(type(pre[0,0]))
+            #     vis.image(
+            #         pre,
+            #         opts=dict(title='predict!', caption='predict.'),
+            #         win=pre_window,
+            #     )
+            #     ground=disparity.data.cpu().numpy().astype('float32')
+            #     #print(ground.shape)
+            #     ground = ground[0, :, :]
+            #     ground = (np.reshape(ground, [480, 640]).astype('float32')-np.min(ground))/(np.max(ground)-np.min(ground))
+            #     vis.image(
+            #         ground,
+            #         opts=dict(title='ground!', caption='ground.'),
+            #         win=ground_window,
+            #     )
             
             loss_rec.append([i+epoch*816,torch.Tensor([loss.item()]).unsqueeze(0).cpu()])
             print("data [%d/816/%d/%d] Loss: %.4f" % (i, epoch, args.n_epoch,loss.item()))
