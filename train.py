@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-05 23:34:37
+# @Last Modified time: 2018-09-06 10:37:41
 import sys
 import torch
 import visdom
@@ -25,7 +25,7 @@ import os
 
 
 def train(args):
-    torch.backends.cudnn.benchmark=True
+    #torch.backends.cudnn.benchmark=True
     # Setup Augmentations
     data_aug = Compose([RandomRotate(10),
                         RandomHorizontallyFlip()])
@@ -80,9 +80,10 @@ def train(args):
 
     # Check if model has custom optimizer / loss
     # modify to adam, modify the learning rate
-
-    optimizer = torch.optim.SGD(
-        model.parameters(), lr=args.l_rate,momentum=0.90, weight_decay=5e-4)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=args.l_rate,weight_decay=5e-4,betas=(0.9,0.999))
+    # optimizer = torch.optim.SGD(
+    #     model.parameters(), lr=args.l_rate,momentum=0.90, weight_decay=5e-4)
 
     loss_fn = l2
     trained=0
@@ -163,11 +164,11 @@ def train(args):
             outputs = model(left,right,P=P,pre=pre_match,matching=matching,aggregation=aggregation)
 
             #outputs=outputs
-            loss = l1(input=outputs, target=disparity)
+            loss = l1(input=outputs, target=disparity,mask=P)
             # print('training:'+str(i)+':learning_rate'+str(loss.data.cpu().numpy()))
             loss.backward()
             optimizer.step()
-            torch.cuda.empty_cache()
+            #torch.cuda.empty_cache()
 
             # if args.visdom:
             #     vis.line(

@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-05 23:33:20
+# @Last Modified time: 2018-09-06 10:35:18
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -326,31 +326,33 @@ class rstereo(nn.Module):
               #cost_volume[matching[3][i],matching[4][i],d]=torch.where(l_r_y>=0,cosine_s(l_feature,l_r_o_t),zero)
               l_cost=torch.where(l_r_y>=0,cosine_s(l_feature,l_r_o_t),zero)
               cost_volume[matching[3][i],matching[4][i],d]=l_cost
-            plane=aggregation[0][i]
-            plane_num=aggregation[1][i]
-            s_plane=aggregation[2][i]
-            s_plane_num=aggregation[3][i]
-            l_plane=aggregation[4][i]
-            l_plane_num=aggregation[5][i]
-            for j in range(len(plane)):
-              if plane_num[0][j]<=1:
-                continue
+            disparity[matching[-5][i],matching[-4][i]]=self.ss_argmin(cost_volume[matching[-5][i],matching[-4][i],:].cuda(0),matching[-1][i].float().cuda(0))
+            disparity[matching[-3][i],matching[-2][i]]=self.ss_argmin(cost_volume[matching[-3][i],matching[-2][i],:].cuda(0),matching[-1][i].float().cuda(0))
+            # plane=aggregation[0][i]
+            # plane_num=aggregation[1][i]
+            # s_plane=aggregation[2][i]
+            # s_plane_num=aggregation[3][i]
+            # l_plane=aggregation[4][i]
+            # l_plane_num=aggregation[5][i]
+            # for j in range(len(plane)):
+            #   if plane_num[0][j]<=1:
+            #     continue
               #print(s_plane_num[j])
-              if s_plane_num[0][j]>1:
-                s_weights=self.cluster_vector(l_sf[...,x1:x2,y1:y2], s_plane[j][0][0], s_plane[j][0][1]).squeeze().unsqueeze(1)
-                mean_cost=torch.sum(cost_volume[s_plane[j][0][0], s_plane[j][0][1],:]*s_weights,0,keepdim=True)/torch.sum(s_weights)
-                cost_volume[s_plane[j][0][0], s_plane[j][0][1],:]=mean_cost*s_weights+(1-s_weights)*cost_volume[s_plane[j][0][0], s_plane[j][0][1],:]
-              #disparity[x1:x2,y1:y2][s_plane[j][0][0], s_plane[j][0][1]]=self.ss_argmin(cost_volume[s_plane[j][0][0], s_plane[j][0][1],:],matching[-1][i].float())
-              if l_plane_num[0][j]>1:
-                l_weights=self.cluster_vector(l_lf[...,x1:x2,y1:y2], l_plane[j][0][0], l_plane[j][0][1]).squeeze().unsqueeze(1)
-                mean_cost=torch.sum(cost_volume[l_plane[j][0][0], l_plane[j][0][1],:]*l_weights,0,keepdim=True)/torch.sum(l_weights)
-                cost_volume[l_plane[j][0][0], l_plane[j][0][1],:]=mean_cost*l_weights+(1-l_weights)*cost_volume[l_plane[j][0][0], l_plane[j][0][1],:]
-              #disparity[x1:x2,y1:y2][l_plane[j][0][0], l_plane[j][0][1]]=self.ss_argmin(cost_volume[l_plane[j][0][0], l_plane[j][0][1],:],matching[-1][i].float())                
-              weights=self.cluster_vector(torch.cat([l_sf[...,x1:x2,y1:y2],l_lf[...,x1:x2,y1:y2]],-3), \
-                                        plane[j][0][0], plane[j][0][1]).squeeze().unsqueeze(1)
-              mean_cost=torch.sum(cost_volume[plane[j][0][0], plane[j][0][1],:]*weights,0,keepdim=True)/torch.sum(weights) \
-                        #/torch.sum(torch.where(cost_volume[plane[j][0][0], plane[j][0][1],0]==0,zero,weights))
-              cost_volume[plane[j][0][0], plane[j][0][1],:]=mean_cost*weights+(1-weights)*cost_volume[plane[j][0][0], plane[j][0][1],:]
+              # if s_plane_num[0][j]>1:
+              #   s_weights=self.cluster_vector(l_sf[...,x1:x2,y1:y2], s_plane[j][0][0], s_plane[j][0][1]).squeeze().unsqueeze(1)
+              #   mean_cost=torch.sum(cost_volume[s_plane[j][0][0], s_plane[j][0][1],:]*s_weights,0,keepdim=True)/torch.sum(s_weights)
+              #   cost_volume[s_plane[j][0][0], s_plane[j][0][1],:]=mean_cost*s_weights+(1-s_weights)*cost_volume[s_plane[j][0][0], s_plane[j][0][1],:]
+              # #disparity[x1:x2,y1:y2][s_plane[j][0][0], s_plane[j][0][1]]=self.ss_argmin(cost_volume[s_plane[j][0][0], s_plane[j][0][1],:],matching[-1][i].float())
+              # if l_plane_num[0][j]>1:
+              #   l_weights=self.cluster_vector(l_lf[...,x1:x2,y1:y2], l_plane[j][0][0], l_plane[j][0][1]).squeeze().unsqueeze(1)
+              #   mean_cost=torch.sum(cost_volume[l_plane[j][0][0], l_plane[j][0][1],:]*l_weights,0,keepdim=True)/torch.sum(l_weights)
+              #   cost_volume[l_plane[j][0][0], l_plane[j][0][1],:]=mean_cost*l_weights+(1-l_weights)*cost_volume[l_plane[j][0][0], l_plane[j][0][1],:]
+              # #disparity[x1:x2,y1:y2][l_plane[j][0][0], l_plane[j][0][1]]=self.ss_argmin(cost_volume[l_plane[j][0][0], l_plane[j][0][1],:],matching[-1][i].float())                
+              # weights=self.cluster_vector(torch.cat([l_sf[...,x1:x2,y1:y2],l_lf[...,x1:x2,y1:y2]],-3), \
+              #                           plane[j][0][0], plane[j][0][1]).squeeze().unsqueeze(1)
+              # mean_cost=torch.sum(cost_volume[plane[j][0][0], plane[j][0][1],:]*weights,0,keepdim=True)/torch.sum(weights) \
+              #           #/torch.sum(torch.where(cost_volume[plane[j][0][0], plane[j][0][1],0]==0,zero,weights))
+              # cost_volume[plane[j][0][0], plane[j][0][1],:]=mean_cost*weights+(1-weights)*cost_volume[plane[j][0][0], plane[j][0][1],:]
 
               # weights=self.cluster_vector(torch.cat([l_sf[...,x1:x2,y1:y2],l_lf[...,x1:x2,y1:y2]],-3), \
               #                              plane[j][0][0], plane[j][0][1]).squeeze().unsqueeze(1)
@@ -360,11 +362,11 @@ class rstereo(nn.Module):
             #ss_argmin
             # disparity[matching[-5][i],matching[-4][i]]=self.ss_argmin(cost_volume[matching[-5][i],matching[-4][i],:],matching[-1][i].float())
             # disparity[matching[-3][i],matching[-2][i]]=self.ss_argmin(cost_volume[matching[-3][i],matching[-2][i],:],matching[-1][i].float())
-              disparity[plane[j][0][0], plane[j][0][1],]=self.ss_argmin(cost_volume[plane[j][0][0], plane[j][0][1],:].cuda(0),matching[-1][i].float().cuda(0)).cuda(0)
+            # disparity[plane[j][0][0], plane[j][0][1],]=self.ss_argmin(cost_volume[plane[j][0][0], plane[j][0][1],:].cuda(0),matching[-1][i].float().cuda(0)).cuda(0)
           # print(time.time()-start_time)
           # time.sleep(100)
 
-          print(torch.max(disparity),torch.min(disparity))
+          #print(torch.max(disparity),torch.min(disparity))
           
 
 
