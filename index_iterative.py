@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-08-31 17:25:26
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-06 10:07:06
+# @Last Modified time: 2018-09-07 20:35:13
 import torch
 import numpy as np
 import os
@@ -65,10 +65,14 @@ def pre_matching(start,end):
         for m in range(int(np.max(P3)+1)):
             x1,y1,x2,y2,size=l_box[m]
             min_d=l_d[0,m]
+            if min_d==0:
+                min_d=1
             max_d=l_d[1,m]
             if min_d>300:
-                min_d=0
+                min_d=1
                 max_d=192
+            min_d=1
+            max_d=192
             object=P3[x1:x2,y1:y2]
             object=np.where(object==m,1,0)
             s_pixel=object*P1[x1:x2,y1:y2]
@@ -167,16 +171,16 @@ left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
 left_files=os.listdir(left_dir)
 left_files.sort()
 length=len(left_files)
-start=[]
-end=[]
-p = Pool(thread_num)
-for z in range(thread_num):
-    start.append(z*length/10)
-    end.append((z+1)*length/10)
-for z in range(thread_num):
-    p.apply_async(pre_matching, args=(start[z],end[z]))
+# start=[]
+# end=[]
+# p = Pool(thread_num)
+# for z in range(thread_num):
+#     start.append(z*length/10)
+#     end.append((z+1)*length/10)
+# for z in range(thread_num):
+#     p.apply_async(pre_matching, args=(start[z],end[z]))
 
-p.close()
-p.join()
-#1=.fl-pre_matching(0,1)
+# p.close()
+# p.join()
+pre_matching(0,1)
 print('end')

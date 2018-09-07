@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-03-19 13:33:07
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-05 23:27:22
+# @Last Modified time: 2018-09-07 20:37:44
 
 import os
 import torch
@@ -25,7 +25,6 @@ class SceneFlow(data.Dataset):
         self.is_transform = is_transform
         self.n_classes = 9  # 0 is reserved for "other"
         self.img_size = img_size if isinstance(img_size, tuple) else (540, 960)
-        self.mean = np.array([104.00699, 116.66877, 122.67892])
         self.stats={'mean': [0.485, 0.456, 0.406],
                    'std': [0.229, 0.224, 0.225]}
         self.left_files = {}
@@ -33,6 +32,7 @@ class SceneFlow(data.Dataset):
         self.left_files=os.listdir(os.path.join(self.datapath,'left'))
         self.match_files=os.listdir(os.path.join(self.datapath,'match'))
         self.left_files.sort()
+
         self.task='generation'
         if len(self.left_files)<1:
             raise Exception("No files for ld=[%s] found in %s" % (split, self.ld))
@@ -51,10 +51,9 @@ class SceneFlow(data.Dataset):
         index=0
         data=np.load(os.path.join(self.datapath,'left',self.left_files[index]))
         data=data[:540,:960,:]
-        left=data[...,0:3]
+        left=data[...,0:3]/255
         #print(data.shape)
-        right=data[...,3:6]
-
+        right=data[...,3:6]/255
         disparity=data[...,6]
         P=data[...,7:]
         pre_match=np.load(os.path.join(self.datapath,'match',self.left_files[index]))
@@ -75,8 +74,12 @@ class SceneFlow(data.Dataset):
             transforms.ToTensor(),
             transforms.Normalize(**self.stats),
         ])
+        # left=transforms.ToTensor()(left)
+        # left=transforms.Normalize(**self.stats)(left)
+     
         left=trans(left).float()
         right=trans(right).float()
+
         disparity=torch.from_numpy(disparity).float()
         P=torch.from_numpy(P).float()
         s_match_x=[]

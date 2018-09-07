@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 16:31:14
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-06 10:36:05
+# @Last Modified time: 2018-09-07 21:53:10
 
 import torch
 import numpy as np
@@ -72,19 +72,13 @@ def cross_entropy2d(input, target, weight=None, size_average=True):
 def l1(input, target,mask, weight=None, size_average=True):
     P1=mask[...,0]
     P2=mask[...,3]
-    mask=torch.where(P2+P1>0,torch.ones(1).cuda(),torch.zeros(1).cuda())
+    mask=torch.where(P1>0,torch.ones(1).cuda(),torch.zeros(1).cuda())
     mask=torch.reshape(mask,(input.shape))
     target=torch.reshape(target,(input.shape))
-    #print(input.shape)
-    #print(target.shape)
-    # num=torch.sum(torch.where(input==0,torch.ones_like(input),torch.zeros_like(input)))
-    # positive=num/torch.sum(torch.ones_like(input))
-    #print(positive.item())
-    loss=nn.MSELoss(reduction='none')
-    relation=torch.sum(torch.where(mask==torch.ones(1).cuda(),torch.sqrt(loss(input,target)),torch.zeros(1).cuda()))/torch.sum(mask)
-    #mean=torch.abs(torch.mean(input)-torch.mean(target))
-    #print("pre_depth:%.4f,ground_depth:%.4f"%(torch.mean(input[1]).data.cpu().numpy().astype('float32'),torch.mean(target).data.cpu().numpy().astype('float32')))
-    #output=relation+0.2*mean
+    loss=nn.L1loss(reduction='none')
+    #print(torch.sqrt(loss(input,target)).shape)
+    relation=torch.sum(mask*loss(input,target))/torch.sum(mask)
+
     return relation
 def l2(input, target, weight=None, size_average=True):
     target=torch.reshape(target,(input.shape))
