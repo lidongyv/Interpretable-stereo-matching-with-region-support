@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-10 10:20:49
+# @Last Modified time: 2018-09-10 22:12:48
 import numpy as np
 import os
 import time
@@ -65,7 +65,7 @@ def pre_matching(start,end):
             x_matching=np.where(x_matching>0.8,1,0)
             y_matching=np.min([(r_box[:,3]-r_box[:,1]),np.ones_like(r_box[:,0])*(y2-y1)],0)/np.max([(r_box[:,3]-r_box[:,1]), \
                        np.ones_like(r_box[:,0])*(y2-y1)],0)
-            y_matching=np.where(y_matching>0.5,1,0)
+            y_matching=np.where(y_matching>0.7,1,0)
             y_check=np.where(r_box[:,1]<=y2,1,0)
             y_matching=y_matching*y_check
             matching=x_matching*y_matching
@@ -87,7 +87,7 @@ def pre_matching(start,end):
                     overlap.append(np.max(shift))
                 else:
                     overlap.append(-1)
-            if np.max(overlap)>0:
+            if np.max(overlap)>0.75:
                 match.append(np.argmax(overlap))
             else:
                 match.append(-1)
@@ -100,10 +100,16 @@ def pre_matching(start,end):
         b=l_box[:,3]-r_box[match,3]
         min_d=np.where(match==-1,0,np.max([np.min([a,b],0)-variance_d,np.zeros_like(match)],0))
         max_d=np.where(match==-1,192,np.min([np.max([a,b],0)+variance_d,np.ones_like(match)*192+min_d],0))
+        min_d=np.where(min_d>300,0,min_d)
+        max_d=np.where(min_d>300,192,max_d)        
         min_d=np.where(l_box[:,3]-l_box[:,1]>900,0,min_d)
         max_d=np.where(l_box[:,3]-l_box[:,1]>900,l_box[:,2]-l_box[:,0],max_d)
         min_d=np.where(min_d>l_box[:,3],0,np.max([min_d,np.zeros_like(match)],0))
-        max_d=np.where(max_d<=min_d,min_d+192,max_d)
+        max_d=np.where(min_d>l_box[:,3],192,np.max([max_d,np.zeros_like(match)],0))
+        min_d_t=np.where(max_d<=min_d,0,min_d)
+        max_d_t=np.where(max_d<=min_d,192,max_d)
+        min_d=min_d_t
+        max_d=max_d_t
         max_d=np.min([max_d,l_box[:,3]],0)
         pre2.append(np.array([min_d,max_d]))
         pre_match=np.array([pre,pre2])

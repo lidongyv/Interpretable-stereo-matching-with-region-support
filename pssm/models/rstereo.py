@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-09 16:39:36
+# @Last Modified time: 2018-09-10 22:19:02
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -315,19 +315,18 @@ class rstereo(nn.Module):
         weights=torch.norm(cluster_feature-mean,dim=1)
         weights=torch.exp(-weights)
         return weights
-    def forward(self, l,r,P,pre,matching,aggregation):
+    def forward(self, l,r,P,pre,pre2):
         #self.P=P[1,0]
         #0 l to r,1 min,2 max
         #[l_box,r_box,match],[min_d,max_d]
         start_time=time.time()
         self.pre=pre.cuda(1)
-        P1=P[...,0].cuda(1)
-        P2=P[...,3].cuda(1)
-        P3=P[...,1].cuda(1)
-        P4=P[...,2].cuda(1)
+        P1=P[...,0].cuda(1).squeeze()
+        P2=P[...,3].cuda(1).squeeze()
+        P3=P[...,1].cuda(1).squeeze()
+        P4=P[...,2].cuda(1).squeeze()
         #feature extraction
-        l_mask=P2-P1
-        s_mask=P1
+        P2=P2-P1
         l_sf=self.feature_extraction2(l)
         l_lf=self.feature_extraction(l_sf)
 
@@ -351,75 +350,67 @@ class rstereo(nn.Module):
 
         start_time=time.time()
         for i in range(torch.max(P3).type(torch.int32)):
-          if (matching[-5][i].shape[0]+matching[-3][i].shape[0])<10:
-            continue
-          x1,y1,x2,y2,size=pre[0,i].long()
-          #print(matching[-1][i].shape)
-          #matching[-1][i]=torch.arange(matching[-1][i].shape[1]).cuda(1)
-          max_d=torch.max(matching[-1][i])
-          min_d=torch.min(matching[-1][i])
-          
-          #cost_volume=torch.zeros(x2-x1,y2-y1,max_d-min_d+1).cuda(1)
-          #ground 0-270, sky 0-40
-          #intial 0.46, after 0.18,volume 0.3
-          #cost computation intial 0.20,after 0.14,volume 0.3
+            with torch.no_grad():
+                x1,y1,x2,y2,size=pre[0,i].long()
+                region=P3[x1:x2,y1:y2]
+                P1_r=P1[x1:x2,y1:y2]
+                P2_r=P2[x1:x2,y1:y2]
+                region=torch.where(region==i,one,zero)
+                pixels=torch.sum(region).item()
+                object1=region*P1_r
+                object2=region*P2_r
+                region=region-object1-object2
+                index_r=region.nonzero()
+                index1=object1.nonzero()
+                index2=object2.nonzero()
+                if index1.shape[0]>0:
+                  index1=index1[torch.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/2),pixels/25]).astype(np.int),)).long(),:]
+                if index2.shape[0]>0: 
+                  #index2=index2[torch.randint(low=0,high=index2.shape[0],size=(np.ceil(index2.shape[0]/2).astype(np.int),)).long(),:]
+                  index2=torch.cat([index2[torch.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/4),pixels/25]).astype(np.int),)).long(),:], \
+                       index_r[torch.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/36),pixels/36]).astype(np.int),)).long(),:]],0)
+                max_d=pre2[0,1,i].long()
+                min_d=pre2[0,0,i].long()
+                max_d=200
+                min_d=0               
+                d=torch.arange(min_d,max_d+1).cuda(1)
+                if index1.shape[0]>0:
+                  d_index1=d.expand(index1.shape[0],max_d-min_d+1).contiguous().view(-1)
+                  index1_d_x=index1[:,0].view(index1.shape[0],1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
+                  index1_d_y=index1[:,1].view(index1.shape[0],1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
+                if index2.shape[0]>0:
+                  d_index2=d.expand(index2.shape[0],max_d-min_d+1).contiguous().view(-1)
+                  index2_d_x=index2[:,0].view(index2.shape[0],1).expand(index2.shape[0],d.shape[0]).contiguous().view(-1)
+                  index2_d_y=index2[:,1].view(index2.shape[0],1).expand(index2.shape[0],d.shape[0]).contiguous().view(-1)
+                count=count+index2.shape[0]+index1.shape[0]
 
-          if torch.max(matching[-5][i])>=0:
-            #print(matching[0][i],matching[0][i].shape)
-            #exit()
-            print(i,matching[-5][i].shape[0],min_d,max_d)
-            count=count+matching[-5][i].shape[0]+matching[-3][i].shape[0]
-            s_feature=l_lf[...,x1:x2,y1:y2][...,matching[0][i],matching[1][i]]
-            s_r_y=torch.max(matching[1][i]+y1-matching[2][i],-torch.ones_like(matching[2][i]))
-            s_r_o_t=r_lf[...,matching[0][i]+x1,s_r_y]
-            #print(s_feature[...,-1])
-            #s_cost=torch.where(s_r_y>=0,-torch.sum(s_feature*s_r_o_t,1),one*1e+3)
-            #s_cost=self.similarity1((s_feature*s_r_o_t).unsqueeze(-1))
-            s_cost=self.similarity1((s_feature-s_r_o_t).unsqueeze(-1))+self.similarity2((s_feature*s_r_o_t).unsqueeze(-1))
-            s_cost=s_cost.squeeze()
-            #print(s_cost.shape,s_r_y.shape)
-            s_cost=torch.where(s_r_y>=0,-s_cost,40*one)
-            #print(s_cost.shape)
-            #s_cost=torch.where(s_r_y>=0,-4*cosine_s(s_feature,s_r_o_t),4*one)
-            #s_cost=torch.where(s_r_y>=0,torch.log(torch.norm(s_feature-s_r_o_t,1)+1e-6),one*1e+6)
-            #print(value)
-            #disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]=l_sf[...,x1:x2,y1:y2][...,matching[-5][i],matching[-4][i]].view(1,matching[-5][i].shape[0]).cuda(0)
-            #d=matching[2][i]-min_d-
-            #cost_volume[matching[0][i],matching[1][i],d]=s_cost
-
-            disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]=self.ss_argmin(s_cost.view(1,matching[-5][i].shape[0],matching[-1][i].shape[0]).cuda(0),matching[-1][i].float().cuda(0))
-            #sprint(disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]])
-            #disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]=s_cost.view(1,matching[-5][i].shape[0],matching[-1][i].shape[0]).cuda(0)[...,-1]
-            
-            #print( torch.max(disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]),torch.min( disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]))
-          # if torch.max(matching[-3][i])>0:
-          #   l_feature=l_lf[...,x1:x2,y1:y2][...,matching[3][i],matching[4][i]].cuda(1)
-          #   l_r_y=torch.max(matching[4][i]+y1-matching[5][i],-torch.ones_like(matching[5][i]))
-          #   l_r_o_t=r_lf[...,matching[3][i]+x1,l_r_y].cuda(1)
-          #   #d=matching[5][i]-min_d
-          #   #l_cost=torch.where(l_r_y>=0,-torch.sum(l_feature*l_r_o_t,1),-one*1e+8)
-          #   #l_cost=torch.where(l_r_y>=0,-cosine_s(l_feature,l_r_o_t),one)
-          #   l_cost=self.similarity1((l_feature-l_r_o_t).unsqueeze(-1))+self.similarity2((l_feature*l_r_o_t).unsqueeze(-1))
-          #   l_cost=l_cost.squeeze()
-          #   l_cost=torch.where(l_r_y>=0,-l_cost,40*one)
-          #   #cost_volume[matching[3][i],matching[4][i],d]=l_cost
-          #   #a=matching[-3][i]
-          #   #print(a,a.shape)
-          #   disparity[x1:x2,y1:y2][matching[-3][i],matching[-2][i]]=self.ss_argmin(l_cost.view(1,matching[-3][i].shape[0],matching[-1][i].shape[0]).cuda(0),matching[-1][i].float().cuda(0))
-          # #disparity[matching[-5][i],matching[-4][i]]=self.ss_argmin(cost_volume[matching[-5][i],matching[-4][i],:].cuda(0),matching[-1][i].float().cuda(0))
-          # #disparity[matching[-3][i],matching[-2][i]]=self.ss_argmin(cost_volume[matching[-3][i],matching[-2][i],:].cuda(0),matching[-1][i].float().cuda(0))
-          #print(matching[-5][i].shape[0],y1.item(),min_d.item(),max_d.item(),torch.max(disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]).item(),torch.min(disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]).item())
-          #print(matching[-3][i].shape[0],y1.item(),min_d.item(),max_d.item(),torch.max(disparity[x1:x2,y1:y2][matching[-3][i],matching[-2][i]]).item(),torch.min(disparity[x1:x2,y1:y2][matching[-3][i],matching[-2][i]]).item())            
-          # print(matching[-1][i])
-          # print(matching[-5][i],matching[-1][i],s_cost.shape,matching[2][i].shape)
-          # print(s_cost.view(1,matching[-5][i].shape[1],matching[-1][i].shape[1]).shape)
-          # disparity[matching[-5][i],matching[-4][i]]=self.ss_argmin(cost_volume[matching[-5][i],matching[-4][i],:].cuda(0),matching[-1][i].float().cuda(0))
-          # disparity[matching[-3][i],matching[-2][i]]=self.ss_argmin(cost_volume[matching[-3][i],matching[-2][i],:].cuda(0),matching[-1][i].float().cuda(0))
-        print(time.time()-start_time)
-        #print(self.similarity1.s1.item(),self.similarity2.s2.item(),torch.max(torch.where(s_mask>zero,disparity,zero)).item(),torch.min(torch.where(s_mask>zero,disparity,192*one)).item())
-        print(count,count/960/540)
+            if index1.shape[0]>0:
+                s_feature=l_sf[...,x1:x2,y1:y2][...,index1[:,0],index1[:,1]].unsqueeze(-1).contiguous() \
+                            .expand(l_sf.shape[0],l_sf.shape[1],index1.shape[0],d.shape[0]).contiguous() \
+                            .view(l_sf.shape[0],l_sf.shape[1],d.shape[0]*index1.shape[0])
+                s_r_y=torch.max(index1_d_y+y1-d_index1,-torch.ones_like(index1_d_y))
+                s_r_o_t=r_sf[...,index1_d_x+x1,s_r_y]
+                s_cost=self.similarity1((torch.where(s_r_y>=0,s_feature-s_r_o_t,2*s_feature)).unsqueeze(-1)) \
+                      +self.similarity2((torch.where(s_r_y>=0,s_feature*s_r_o_t,zero)).unsqueeze(-1))
+                s_cost=s_cost.squeeze()
+                s_cost=torch.where(s_r_y>=0,-s_cost,40*one)
+                disparity[x1:x2,y1:y2][index1[:,0],index1[:,1]]=self.ss_argmin(s_cost.view(1,index1.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
+                
+            if index2.shape[0]>0:
+                l_feature=l_lf[...,x1:x2,y1:y2][...,index2[:,0],index2[:,1]].unsqueeze(-1).contiguous() \
+                          .expand(l_lf.shape[0],l_lf.shape[1],index2.shape[0],d.shape[0]).contiguous() \
+                          .view(l_lf.shape[0],l_lf.shape[1],d.shape[0]*index2.shape[0])
+                l_r_y=torch.max(index2_d_y+y1-d_index2,-torch.ones_like(index2_d_y))
+                l_r_o_t=r_lf[...,index2_d_x+x1,l_r_y]
+                l_cost=self.similarity1((torch.where(l_r_y>=0,l_feature-l_r_o_t,2*l_feature)).unsqueeze(-1)) \
+                      +self.similarity2((torch.where(l_r_y>=0,l_feature*l_r_o_t,zero)).unsqueeze(-1))
+                l_cost=l_cost.squeeze()
+                l_cost=torch.where(l_r_y>=0,-l_cost,40*one)
+                disparity[x1:x2,y1:y2][index2[:,0],index2[:,1]]=self.ss_argmin(l_cost.view(1,index2.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
+            #print(min_d.item(),max_d.item(),torch.max(disparity).item())
+        #print(count,count/960/540)
         #time.sleep(1000)
-        exit()
+        #exit()
         return disparity
 
 

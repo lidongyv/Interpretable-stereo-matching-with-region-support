@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-09 15:26:54
+# @Last Modified time: 2018-09-10 22:19:41
 import sys
 import torch
 import visdom
@@ -105,7 +105,7 @@ def train(args):
         #trained
         print('training!')
         model.train()
-        for i, (left, right,disparity,P,pre_match,matching,aggregation) in enumerate(trainloader):
+        for i, (left, right,disparity,P,pre_match,pre2) in enumerate(trainloader):
             #with torch.no_grad():
             #print(left.shape)
             start_time=time.time()
@@ -114,21 +114,11 @@ def train(args):
             disparity = disparity.cuda(0)
             P = P.cuda(1)
             pre_match=pre_match.cuda(1)
-            for m in range(len(matching)):
-                for n in range(len(matching[m])):
-                    #print(matching[m][n].shape)
-                    if matching[m][n].shape[1]>1:
-                        matching[m][n]=matching[m][n].cuda(1).squeeze()
-                    else:
-                        matching[m][n]=matching[m][n].cuda(1).view(1)
+            pre2=pre2.cuda(1)
 
-
-            #plane = plane.cuda(1)
-            #s_plane=s_plane.cuda(1)
-            #l_plane=l_plane.cuda(1)
             optimizer.zero_grad()
             #print(P.shape)
-            outputs = model(left,right,P=P,pre=pre_match,matching=matching,aggregation=aggregation)
+            outputs = model(left,right,P=P,pre=pre_match,pre2=pre2)
 
             #outputs=outputs
             loss = l1(input=outputs, target=disparity,mask=P)
@@ -178,7 +168,7 @@ def train(args):
             #     )
             
             loss_rec.append(loss.item())
-            print("data [%d/816/%d/%d] Loss: %.4f" % (i, epoch, args.n_epoch,loss.item()))
+            print("data [%d/4400/%d/%d] Loss: %.4f" % (i, epoch, args.n_epoch,loss.item()))
 
             # if i>2:
             #     if loss_rec[-1]-loss_rec[-2]>5:
