@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-07 17:26:16
+# @Last Modified time: 2018-09-09 15:26:54
 import sys
 import torch
 import visdom
@@ -41,7 +41,7 @@ def train(args):
 
     n_classes = t_loader.n_classes
     trainloader = data.DataLoader(
-        t_loader, batch_size=args.batch_size, num_workers=0, shuffle=True)
+        t_loader, batch_size=args.batch_size, num_workers=0, shuffle=False)
     valloader = data.DataLoader(
         v_loader, batch_size=args.batch_size, num_workers=0)
 
@@ -52,6 +52,11 @@ def train(args):
 
     # Setup Model
     model = get_model(args.arch)
+    # parameters=model.named_parameters()
+    # for name,param in parameters:
+    #     print(name)
+    #     print(param.grad)
+    # exit()
 
     # model = torch.nn.DataParallel(
     #     model, device_ids=range(torch.cuda.device_count()))
@@ -60,10 +65,10 @@ def train(args):
 
     # Check if model has custom optimizer / loss
     # modify to adam, modify the learning rate
-    # optimizer = torch.optim.Adam(
-    #     model.parameters(), lr=args.l_rate,weight_decay=5e-4,betas=(0.9,0.999),amsgrad=True)
-    optimizer = torch.optim.SGD(
-        model.parameters(), lr=args.l_rate,momentum=0.90, weight_decay=5e-5)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=args.l_rate,weight_decay=5e-4,betas=(0.9,0.999),amsgrad=True)
+    # optimizer = torch.optim.SGD(
+    #     model.parameters(), lr=args.l_rate,momentum=0.90, weight_decay=5e-5)
 
     loss_fn = l1
     trained=0
@@ -116,10 +121,7 @@ def train(args):
                         matching[m][n]=matching[m][n].cuda(1).squeeze()
                     else:
                         matching[m][n]=matching[m][n].cuda(1).view(1)
-            for m in range(len(aggregation)):
-                for n in range(len(aggregation[m])):
-                    for o in range(len(aggregation[m][n])):
-                        aggregation[m][n][o]=aggregation[m][n][o].cuda(1)
+
 
             #plane = plane.cuda(1)
             #s_plane=s_plane.cuda(1)
@@ -138,15 +140,15 @@ def train(args):
                      }
                 torch.save(state, "{}_{}_best_model.pkl".format(
                     args.arch, args.dataset))
-                for name,param in parameters:
-                    print(name)
-                    print(param.grad)
+                # for name,param in parameters:
+                #     print(name)
+                #     print(param.grad)
                 exit()
             parameters=model.named_parameters()
             optimizer.step()
 
             print(time.time()-start_time)
-            #torch.cuda.empty_cache()
+            torch.cuda.empty_cache()
 
             # if args.visdom:
             #     vis.line(
@@ -187,7 +189,12 @@ def train(args):
             #         torch.save(state, "{}_{}_best_model.pkl".format(
             #             args.arch, args.dataset))
             #         exit()
-        
+        state = {'epoch': epoch+1,
+         'model_state': model.state_dict(),
+         'optimizer_state': optimizer.state_dict(),
+         }
+        torch.save(state, "{}_{}_{}_best_model.pkl".format(
+        epoch,args.arch, args.dataset))    
     
 
 
@@ -206,7 +213,7 @@ if __name__ == '__main__':
                         help='# of the epochs')
     parser.add_argument('--batch_size', nargs='?', type=int, default=1,
                         help='Batch Size')
-    parser.add_argument('--l_rate', nargs='?', type=float, default=1e-2,
+    parser.add_argument('--l_rate', nargs='?', type=float, default=1e-3,
                         help='Learning Rate')
     parser.add_argument('--feature_scale', nargs='?', type=int, default=1,
                         help='Divider for # of features to use')

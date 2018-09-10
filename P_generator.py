@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-06-20 14:37:27
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-07-03 15:30:47
+# @Last Modified time: 2018-09-09 17:03:46
 import cupy
 import cv2
 import numpy
@@ -208,40 +208,6 @@ ax[1].imshow(P2, cmap=plt.cm.gray)
 ax[2].imshow(P3_v, cmap=plt.cm.gray)
 ax[3].imshow(P4, cmap=plt.cm.gray)
 ax[4].imshow(overlap, cmap=plt.cm.gray)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     # cv2.imwrite(os.path.join(visual_dir,n_l_image[i]),object)

@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 16:31:14
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-07 21:53:10
+# @Last Modified time: 2018-09-08 18:45:32
 
 import torch
 import numpy as np
@@ -70,15 +70,18 @@ def cross_entropy2d(input, target, weight=None, size_average=True):
     #    loss=loss/(950*540)
     return loss
 def l1(input, target,mask, weight=None, size_average=True):
-    P1=mask[...,0]
-    P2=mask[...,3]
-    mask=torch.where(P1>0,torch.ones(1).cuda(),torch.zeros(1).cuda())
+    P1=mask[...,0].cuda(0)
+    P2=mask[...,3].cuda(0)
+    one,zero=torch.ones(1).cuda(0),torch.zeros(1).cuda(0)
+    mask=torch.where(P1>0,one,zero)
     mask=torch.reshape(mask,(input.shape))
     target=torch.reshape(target,(input.shape))
-    loss=nn.L1loss(reduction='none')
+    loss=nn.L1Loss(reduction='none')
+    #loss=nn.MSELoss(reduction='none')
     #print(torch.sqrt(loss(input,target)).shape)
     relation=torch.sum(mask*loss(input,target))/torch.sum(mask)
-
+    print(torch.max(torch.where(P1>zero,target,zero)),torch.min(torch.where(P1>zero,target,192*one)))
+    #relation=torch.sum(torch.sqrt(mask*loss(input,target)))/torch.sum(mask)
     return relation
 def l2(input, target, weight=None, size_average=True):
     target=torch.reshape(target,(input.shape))

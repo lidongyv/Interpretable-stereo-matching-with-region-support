@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-07 21:54:01
+# @Last Modified time: 2018-09-09 16:39:36
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -180,7 +180,7 @@ class feature_extraction2(nn.Module):
         self.gn3 = nn.GroupNorm(group_dim,32)
         self.relu3 = nn.LeakyReLU(inplace=True)
         self.layer1 = self._make_layer(BasicBlock, 32, 1, 1,1,1)
-        self.lastconv = nn.Conv2d(32, 1, 3, 1, 1, 1)
+        self.lastconv = nn.Conv2d(32, 32, 3, 1, 1, 1)
 
         for m in self.modules():
           if isinstance(m,nn.Conv2d):
@@ -214,8 +214,69 @@ class feature_extraction2(nn.Module):
 
         return output
 
+class similarity_measure1(nn.Module):
+    def __init__(self):
+        super(similarity_measure1, self).__init__()
+        self.inplanes = 32
+        self.conv1 = nn.Conv2d(32, 16, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        self.conv2 = nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        self.conv3 = nn.Conv2d(4, 1, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        # self.conv4 = nn.Conv2d(8, 2, kernel_size=1, stride=1, padding=0,
+        #                        bias=False,dilation=1)        
+        # self.lastconv = nn.Conv2d(2, 1, kernel_size=1, stride=1, padding=0,
+        #                        bias=False,dilation=1)
+        self.s1=nn.Parameter(torch.ones(1)).float()
+        for m in self.modules():
+          if isinstance(m,nn.Conv2d):
+            nn.init.kaiming_normal_(m.weight,mode='fan_out',nonlinearity='relu')
+          elif isinstance(m, nn.GroupNorm):
+            nn.init.constant_(m.weight,1)
+            nn.init.constant_(m.bias,0)
+    def forward(self, x):
+        output = self.conv1(x)
 
+        output = self.conv2(output)
 
+        output = self.conv3(output)
+        # output=self.conv4(output)
+        # output=self.lastconv(output)
+        output=output*self.s1
+        return output
+class similarity_measure2(nn.Module):
+    def __init__(self):
+        super(similarity_measure2, self).__init__()
+        self.inplanes = 32
+        self.conv1 = nn.Conv2d(32, 16, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        self.conv2 = nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        self.conv3 = nn.Conv2d(4, 1, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        # self.conv4 = nn.Conv2d(8, 2, kernel_size=1, stride=1, padding=0,
+        #                        bias=False,dilation=1)        
+        # self.lastconv = nn.Conv2d(2, 1, kernel_size=1, stride=1, padding=0,
+        #                        bias=False,dilation=1)
+        self.s2=nn.Parameter(torch.ones(1)).float()
+
+        for m in self.modules():
+          if isinstance(m,nn.Conv2d):
+            nn.init.kaiming_normal_(m.weight,mode='fan_out',nonlinearity='relu')
+          elif isinstance(m, nn.GroupNorm):
+            nn.init.constant_(m.weight,1)
+            nn.init.constant_(m.bias,0)
+    def forward(self, x):
+        output = self.conv1(x)
+
+        output = self.conv2(output)
+
+        output = self.conv3(output)
+        # output=self.conv4(output)
+        # output=self.lastconv(output)
+        output=self.s2*output
+        return output
 
 
 class rstereo(nn.Module):
@@ -228,9 +289,13 @@ class rstereo(nn.Module):
                  version='scene'):
 
         super(rstereo, self).__init__()
-        #self.feature_extraction=feature_extraction().cuda(0)
+        self.feature_extraction=feature_extraction().cuda(0)
         self.feature_extraction2=feature_extraction2().cuda(0)
         self.softmax= nn.Softmax(dim=-1)
+        self.similarity1=similarity_measure1().cuda(1)
+        self.similarity2=similarity_measure2().cuda(1)
+
+
     def ss_argmin(self,x,index):
         one=torch.ones(1)
         zero=torch.zeros(1)
@@ -264,23 +329,23 @@ class rstereo(nn.Module):
         l_mask=P2-P1
         s_mask=P1
         l_sf=self.feature_extraction2(l)
-        #l_lf=self.feature_extraction(l_sf)
+        l_lf=self.feature_extraction(l_sf)
 
         r_sf=self.feature_extraction2(r)
-        #r_lf=self.feature_extraction(r_sf)
+        r_lf=self.feature_extraction(r_sf)
 
-        disparity=torch.ones([540,960]).cuda(0)*80
+        disparity=torch.ones([540,960]).cuda(0)*30
         one=torch.ones(1).cuda(1)
         zero=torch.zeros(1).cuda(1)
         #cost_volume=[]
         #5710
         #print(value)
-        #l_lf=l_lf.cuda(1)
-        #r_lf=r_lf.cuda(1)
+        l_lf=l_lf.cuda(1)
+        r_lf=r_lf.cuda(1)
         r_sf=r_sf.cuda(1)
         l_sf=l_sf.cuda(1)
 
-        count=0
+        count=zero
         #start_time=time.time()
         #with torch.no_grad():
 
@@ -298,38 +363,50 @@ class rstereo(nn.Module):
           #ground 0-270, sky 0-40
           #intial 0.46, after 0.18,volume 0.3
           #cost computation intial 0.20,after 0.14,volume 0.3
+
           if torch.max(matching[-5][i])>=0:
             #print(matching[0][i],matching[0][i].shape)
             #exit()
-            # s_feature=l_sf[...,x1:x2,y1:y2][...,matching[0][i],matching[1][i]]
-            # s_r_y=torch.max(matching[1][i]+y1-matching[2][i],-torch.ones_like(matching[2][i]))
-            # s_r_o_t=r_sf[...,matching[0][i]+x1,s_r_y]
+            print(i,matching[-5][i].shape[0],min_d,max_d)
+            count=count+matching[-5][i].shape[0]+matching[-3][i].shape[0]
+            s_feature=l_lf[...,x1:x2,y1:y2][...,matching[0][i],matching[1][i]]
+            s_r_y=torch.max(matching[1][i]+y1-matching[2][i],-torch.ones_like(matching[2][i]))
+            s_r_o_t=r_lf[...,matching[0][i]+x1,s_r_y]
             #print(s_feature[...,-1])
             #s_cost=torch.where(s_r_y>=0,-torch.sum(s_feature*s_r_o_t,1),one*1e+3)
-
-            #s_cost=torch.where(s_r_y>=0,-cosine_s(s_feature,s_r_o_t),one)
-            #s_cost=torch.where(s_r_y>=0,torch.log(torch.norm(s_feature-s_r_o_t,1)),one*1e+6)
+            #s_cost=self.similarity1((s_feature*s_r_o_t).unsqueeze(-1))
+            s_cost=self.similarity1((s_feature-s_r_o_t).unsqueeze(-1))+self.similarity2((s_feature*s_r_o_t).unsqueeze(-1))
+            s_cost=s_cost.squeeze()
+            #print(s_cost.shape,s_r_y.shape)
+            s_cost=torch.where(s_r_y>=0,-s_cost,40*one)
+            #print(s_cost.shape)
+            #s_cost=torch.where(s_r_y>=0,-4*cosine_s(s_feature,s_r_o_t),4*one)
+            #s_cost=torch.where(s_r_y>=0,torch.log(torch.norm(s_feature-s_r_o_t,1)+1e-6),one*1e+6)
             #print(value)
-            disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]=l_sf[...,x1:x2,y1:y2][...,matching[-5][i],matching[-4][i]].view(1,matching[-5][i].shape[0]).cuda(0)
+            #disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]=l_sf[...,x1:x2,y1:y2][...,matching[-5][i],matching[-4][i]].view(1,matching[-5][i].shape[0]).cuda(0)
             #d=matching[2][i]-min_d-
             #cost_volume[matching[0][i],matching[1][i],d]=s_cost
-            #disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]=self.ss_argmin(s_cost.view(1,matching[-5][i].shape[0],matching[-1][i].shape[0]).cuda(0),matching[-1][i].float().cuda(0))
+
+            disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]=self.ss_argmin(s_cost.view(1,matching[-5][i].shape[0],matching[-1][i].shape[0]).cuda(0),matching[-1][i].float().cuda(0))
             #sprint(disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]])
             #disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]=s_cost.view(1,matching[-5][i].shape[0],matching[-1][i].shape[0]).cuda(0)[...,-1]
             
             #print( torch.max(disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]),torch.min( disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]))
           # if torch.max(matching[-3][i])>0:
-          #   l_feature=l_lf[...,x1:x2,y1:y2][...,matching[3][i],matching[4][i]]
+          #   l_feature=l_lf[...,x1:x2,y1:y2][...,matching[3][i],matching[4][i]].cuda(1)
           #   l_r_y=torch.max(matching[4][i]+y1-matching[5][i],-torch.ones_like(matching[5][i]))
-          #   l_r_o_t=r_lf[...,matching[3][i]+x1,l_r_y]
+          #   l_r_o_t=r_lf[...,matching[3][i]+x1,l_r_y].cuda(1)
           #   #d=matching[5][i]-min_d
           #   #l_cost=torch.where(l_r_y>=0,-torch.sum(l_feature*l_r_o_t,1),-one*1e+8)
-          #   l_cost=torch.where(l_r_y>=0,-cosine_s(l_feature,l_r_o_t),one)
+          #   #l_cost=torch.where(l_r_y>=0,-cosine_s(l_feature,l_r_o_t),one)
+          #   l_cost=self.similarity1((l_feature-l_r_o_t).unsqueeze(-1))+self.similarity2((l_feature*l_r_o_t).unsqueeze(-1))
+          #   l_cost=l_cost.squeeze()
+          #   l_cost=torch.where(l_r_y>=0,-l_cost,40*one)
           #   #cost_volume[matching[3][i],matching[4][i],d]=l_cost
           #   #a=matching[-3][i]
           #   #print(a,a.shape)
           #   disparity[x1:x2,y1:y2][matching[-3][i],matching[-2][i]]=self.ss_argmin(l_cost.view(1,matching[-3][i].shape[0],matching[-1][i].shape[0]).cuda(0),matching[-1][i].float().cuda(0))
-          #disparity[matching[-5][i],matching[-4][i]]=self.ss_argmin(cost_volume[matching[-5][i],matching[-4][i],:].cuda(0),matching[-1][i].float().cuda(0))
+          # #disparity[matching[-5][i],matching[-4][i]]=self.ss_argmin(cost_volume[matching[-5][i],matching[-4][i],:].cuda(0),matching[-1][i].float().cuda(0))
           # #disparity[matching[-3][i],matching[-2][i]]=self.ss_argmin(cost_volume[matching[-3][i],matching[-2][i],:].cuda(0),matching[-1][i].float().cuda(0))
           #print(matching[-5][i].shape[0],y1.item(),min_d.item(),max_d.item(),torch.max(disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]).item(),torch.min(disparity[x1:x2,y1:y2][matching[-5][i],matching[-4][i]]).item())
           #print(matching[-3][i].shape[0],y1.item(),min_d.item(),max_d.item(),torch.max(disparity[x1:x2,y1:y2][matching[-3][i],matching[-2][i]]).item(),torch.min(disparity[x1:x2,y1:y2][matching[-3][i],matching[-2][i]]).item())            
@@ -339,9 +416,10 @@ class rstereo(nn.Module):
           # disparity[matching[-5][i],matching[-4][i]]=self.ss_argmin(cost_volume[matching[-5][i],matching[-4][i],:].cuda(0),matching[-1][i].float().cuda(0))
           # disparity[matching[-3][i],matching[-2][i]]=self.ss_argmin(cost_volume[matching[-3][i],matching[-2][i],:].cuda(0),matching[-1][i].float().cuda(0))
         print(time.time()-start_time)
-        print(torch.max(torch.where(s_mask>zero,disparity,zero)),torch.min(torch.where(s_mask>zero,disparity,192*one)))
+        #print(self.similarity1.s1.item(),self.similarity2.s2.item(),torch.max(torch.where(s_mask>zero,disparity,zero)).item(),torch.min(torch.where(s_mask>zero,disparity,192*one)).item())
+        print(count,count/960/540)
         #time.sleep(1000)
-
+        exit()
         return disparity
 
 

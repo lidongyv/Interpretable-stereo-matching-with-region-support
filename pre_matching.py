@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-03 22:37:21
+# @Last Modified time: 2018-09-10 10:20:49
 import numpy as np
 import os
 import time
@@ -19,9 +19,9 @@ def crop(object):
     size=np.sum(object)
     return x1,y1,x2+1,y2+1,size
 def pre_matching(start,end):
-    left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
-    right_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/right/'
-    match_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/match/'
+    left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left_re/'
+    right_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/right_re/'
+    match_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/match_re/'
     left_files=os.listdir(left_dir)
     left_files.sort()
     right_files=os.listdir(right_dir)

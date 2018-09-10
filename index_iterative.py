@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-08-31 17:25:26
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-07 20:35:13
+# @Last Modified time: 2018-09-08 18:49:30
 import torch
 import numpy as np
 import os
@@ -71,8 +71,8 @@ def pre_matching(start,end):
             if min_d>300:
                 min_d=1
                 max_d=192
-            min_d=1
-            max_d=192
+            # min_d=0
+            # max_d=100
             object=P3[x1:x2,y1:y2]
             object=np.where(object==m,1,0)
             s_pixel=object*P1[x1:x2,y1:y2]
@@ -116,32 +116,32 @@ def pre_matching(start,end):
 
             l_plane_0=[]
             l_plane_num_0=[]
-            for n in range(1,int(np.max(object_r)+1)):
-                plane_t=np.where(object_r==n,1,0).nonzero()
-                plane_num_0.append(np.array(plane_t[0].shape[0]))
-                plane_0.append(np.array([plane_t[0],plane_t[1]]))
-                s_plane_t=np.where(object_r==n,1,0)*P1[x1:x2,y1:y2]
-                s_plane_t=s_plane_t.nonzero()
-                if s_plane_t[0].shape[0]>0:
-                    s_plane_num_0.append(np.array(s_plane_t[0].shape[0]))
-                    s_plane_0.append(np.array([s_plane_t[0],s_plane_t[1]]))
-                else:
-                    s_plane_num_0.append(np.array(0))
-                    s_plane_0.append(np.array([-1,-1]))
-                l_plane_t=np.where(object_r==n,1,0)*P2[x1:x2,y1:y2]
-                l_plane_t=l_plane_t.nonzero()
-                if l_plane_t[0].shape[0]>0:
-                    l_plane_num_0.append(np.array(l_plane_t[0].shape[0]))
-                    l_plane_0.append(np.array([l_plane_t[0],l_plane_t[1]]))
-                else:
-                    l_plane_num_0.append(np.array(0))
-                    l_plane_0.append(np.array([-1,-1]))
-            plane.append(plane_0)
-            plane_num.append(np.array(plane_num_0))
-            s_plane.append(s_plane_0)
-            s_plane_num.append(np.array(s_plane_num_0))
-            l_plane.append(l_plane_0)
-            l_plane_num.append(np.array(l_plane_num_0))                 
+            # for n in range(1,int(np.max(object_r)+1)):
+            #     plane_t=np.where(object_r==n,1,0).nonzero()
+            #     plane_num_0.append(np.array(plane_t[0].shape[0]))
+            #     plane_0.append(np.array([plane_t[0],plane_t[1]]))
+            #     s_plane_t=np.where(object_r==n,1,0)*P1[x1:x2,y1:y2]
+            #     s_plane_t=s_plane_t.nonzero()
+            #     if s_plane_t[0].shape[0]>0:
+            #         s_plane_num_0.append(np.array(s_plane_t[0].shape[0]))
+            #         s_plane_0.append(np.array([s_plane_t[0],s_plane_t[1]]))
+            #     else:
+            #         s_plane_num_0.append(np.array(0))
+            #         s_plane_0.append(np.array([-1,-1]))
+            #     l_plane_t=np.where(object_r==n,1,0)*P2[x1:x2,y1:y2]
+            #     l_plane_t=l_plane_t.nonzero()
+            #     if l_plane_t[0].shape[0]>0:
+            #         l_plane_num_0.append(np.array(l_plane_t[0].shape[0]))
+            #         l_plane_0.append(np.array([l_plane_t[0],l_plane_t[1]]))
+            #     else:
+            #         l_plane_num_0.append(np.array(0))
+            #         l_plane_0.append(np.array([-1,-1]))
+            # plane.append(plane_0)
+            # plane_num.append(np.array(plane_num_0))
+            # s_plane.append(s_plane_0)
+            # s_plane_num.append(np.array(s_plane_num_0))
+            # l_plane.append(l_plane_0)
+            # l_plane_num.append(np.array(l_plane_num_0))                 
 
         match=[s_match_x,
                 s_match_y,
@@ -171,16 +171,16 @@ left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
 left_files=os.listdir(left_dir)
 left_files.sort()
 length=len(left_files)
-# start=[]
-# end=[]
-# p = Pool(thread_num)
-# for z in range(thread_num):
-#     start.append(z*length/10)
-#     end.append((z+1)*length/10)
-# for z in range(thread_num):
-#     p.apply_async(pre_matching, args=(start[z],end[z]))
+start=[]
+end=[]
+p = Pool(thread_num)
+for z in range(thread_num):
+    start.append(z*length/10)
+    end.append((z+1)*length/10)
+for z in range(thread_num):
+    p.apply_async(pre_matching, args=(start[z],end[z]))
 
-# p.close()
-# p.join()
-pre_matching(0,1)
+p.close()
+p.join()
+# pre_matching(0,1)
 print('end')
