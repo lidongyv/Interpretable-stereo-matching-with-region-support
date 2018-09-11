@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-10 22:19:41
+# @Last Modified time: 2018-09-11 17:17:38
 import sys
 import torch
 import visdom
@@ -25,7 +25,7 @@ from pssm.augmentations import *
 import os
 
 def train(args):
-    #torch.backends.cudnn.benchmark=True
+    torch.backends.cudnn.benchmark=True
     # Setup Augmentations
     data_aug = Compose([RandomRotate(10),
                         RandomHorizontallyFlip()])
@@ -134,7 +134,7 @@ def train(args):
                 #     print(name)
                 #     print(param.grad)
                 exit()
-            parameters=model.named_parameters()
+            #parameters=model.named_parameters()
             optimizer.step()
 
             print(time.time()-start_time)

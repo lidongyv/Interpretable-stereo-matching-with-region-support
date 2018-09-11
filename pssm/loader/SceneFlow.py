@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-03-19 13:33:07
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-11 12:33:23
+# @Last Modified time: 2018-09-11 16:29:26
 
 import os
 import torch
@@ -48,15 +48,15 @@ class SceneFlow(data.Dataset):
 
         :param index:
         """
-        #index=67
-        data=np.load(os.path.join(self.datapath,'left',self.left_files[index]))
+        index=0
+        data=np.load(os.path.join(self.datapath,'left_re',self.left_files[index]))
         data=data[:540,:960,:]
         left=data[...,0:3]/255
         #print(data.shape)
         right=data[...,3:6]/255
         disparity=data[...,6]
         P=data[...,7:]
-        pre_match=np.load(os.path.join(self.datapath,'match',self.left_files[index]))
+        pre_match=np.load(os.path.join(self.datapath,'match_re',self.left_files[index]))
         matching=np.load(os.path.join(self.datapath,'matching',self.left_files[index]))
         aggregation=np.load(os.path.join(self.datapath,'aggregation',self.left_files[index]))
         #print('load')

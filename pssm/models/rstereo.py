@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-11 11:28:42
+# @Last Modified time: 2018-09-11 17:07:13
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -220,8 +220,10 @@ class similarity_measure1(nn.Module):
         self.inplanes = 32
         self.conv1 = nn.Conv2d(32, 16, kernel_size=1, stride=1, padding=0,
                                bias=False,dilation=1)
+        self.relu1 = nn.LeakyReLU(inplace=True)
         self.conv2 = nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0,
                                bias=False,dilation=1)
+        self.relu2 = nn.LeakyReLU(inplace=True)
         self.conv3 = nn.Conv2d(4, 1, kernel_size=1, stride=1, padding=0,
                                bias=False,dilation=1)
         # self.conv4 = nn.Conv2d(8, 2, kernel_size=1, stride=1, padding=0,
@@ -237,9 +239,9 @@ class similarity_measure1(nn.Module):
             nn.init.constant_(m.bias,0)
     def forward(self, x):
         output = self.conv1(x)
-
+        output = self.relu1(output)
         output = self.conv2(output)
-
+        output = self.relu2(output)
         output = self.conv3(output)
         # output=self.conv4(output)
         # output=self.lastconv(output)
@@ -251,8 +253,10 @@ class similarity_measure2(nn.Module):
         self.inplanes = 32
         self.conv1 = nn.Conv2d(32, 16, kernel_size=1, stride=1, padding=0,
                                bias=False,dilation=1)
+        self.relu1 = nn.LeakyReLU(inplace=True)
         self.conv2 = nn.Conv2d(16, 4, kernel_size=1, stride=1, padding=0,
                                bias=False,dilation=1)
+        self.relu2 = nn.LeakyReLU(inplace=True)
         self.conv3 = nn.Conv2d(4, 1, kernel_size=1, stride=1, padding=0,
                                bias=False,dilation=1)
         # self.conv4 = nn.Conv2d(8, 2, kernel_size=1, stride=1, padding=0,
@@ -269,9 +273,9 @@ class similarity_measure2(nn.Module):
             nn.init.constant_(m.bias,0)
     def forward(self, x):
         output = self.conv1(x)
-
+        output = self.relu1(output)
         output = self.conv2(output)
-
+        output = self.relu2(output)
         output = self.conv3(output)
         # output=self.conv4(output)
         # output=self.lastconv(output)
@@ -319,21 +323,22 @@ class rstereo(nn.Module):
         #self.P=P[1,0]
         #0 l to r,1 min,2 max
         #[l_box,r_box,match],[min_d,max_d]
-        start_time=time.time()
+        #start_time=time.time()
         self.pre=pre.cuda(1)
         P1=P[...,0].cuda(1).squeeze()
-        P2=P[...,3].cuda(1).squeeze()
-        P3=P[...,1].cuda(1).squeeze()
-        P4=P[...,2].cuda(1).squeeze()
+        P2=P[...,1].cuda(1).squeeze()
+        P3=P[...,2].cuda(1).squeeze()
+        P4=P[...,3].cuda(1).squeeze()
         #feature extraction
-        P2=P2-P1
+        #P2=P2-P1
+        #print(torch.min(P3),torch.max(P3))
         l_sf=self.feature_extraction2(l)
         l_lf=self.feature_extraction(l_sf)
 
         r_sf=self.feature_extraction2(r)
         r_lf=self.feature_extraction(r_sf)
 
-        disparity=torch.ones([540,960]).cuda(0)*30
+        disparity=torch.zeros([540,960]).cuda(0)
         one=torch.ones(1).cuda(1)
         zero=torch.zeros(1).cuda(1)
         #cost_volume=[]
@@ -348,7 +353,6 @@ class rstereo(nn.Module):
         #start_time=time.time()
         #with torch.no_grad():
 
-        start_time=time.time()
         for i in range(torch.max(P3).type(torch.int32)):
             with torch.no_grad():
                 x1,y1,x2,y2,size=pre[0,i].long()
@@ -372,13 +376,14 @@ class rstereo(nn.Module):
                   index2=torch.cat([index2,index_r[torch.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/36),pixels/36]).astype(np.int),)).long(),:]],0)
                 max_d=pre2[0,1,i].long()
                 min_d=pre2[0,0,i].long()
-                max_d=200
-                min_d=0               
+                # max_d=200
+                # min_d=0          
+                #print(max_d.item(),min_d.item())     
                 d=torch.arange(min_d,max_d+1).cuda(1)
                 if index1.shape[0]>0:
                   d_index1=d.expand(index1.shape[0],max_d-min_d+1).contiguous().view(-1)
-                  index1_d_x=index1[:,0].view(index1.shape[0],1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
-                  index1_d_y=index1[:,1].view(index1.shape[0],1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
+                  index1_d_x=index1[:,0].unsqueeze(-1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
+                  index1_d_y=index1[:,1].unsqueeze(-1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
                 if index2.shape[0]>0:
                   d_index2=d.expand(index2.shape[0],max_d-min_d+1).contiguous().view(-1)
                   index2_d_x=index2[:,0].view(index2.shape[0],1).expand(index2.shape[0],d.shape[0]).contiguous().view(-1)
@@ -391,8 +396,9 @@ class rstereo(nn.Module):
                             .view(l_sf.shape[0],l_sf.shape[1],d.shape[0]*index1.shape[0])
                 s_r_y=torch.max(index1_d_y+y1-d_index1,-torch.ones_like(index1_d_y))
                 s_r_o_t=r_sf[...,index1_d_x+x1,s_r_y]
-                s_cost=self.similarity1((torch.where(s_r_y>=0,s_feature-s_r_o_t,2*s_feature)).unsqueeze(-1)) \
+                s_cost=self.similarity1((torch.where(s_r_y>=0,s_feature-s_r_o_t,zero)).unsqueeze(-1)) \
                       +self.similarity2((torch.where(s_r_y>=0,s_feature*s_r_o_t,zero)).unsqueeze(-1))
+
                 s_cost=s_cost.squeeze()
                 s_cost=torch.where(s_r_y>=0,-s_cost,40*one)
                 disparity[x1:x2,y1:y2][index1[:,0],index1[:,1]]=self.ss_argmin(s_cost.view(1,index1.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
