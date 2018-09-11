@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-03-19 13:33:07
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-10 22:18:08
+# @Last Modified time: 2018-09-11 12:33:23
 
 import os
 import torch
@@ -48,7 +48,7 @@ class SceneFlow(data.Dataset):
 
         :param index:
         """
-        #index=3
+        #index=67
         data=np.load(os.path.join(self.datapath,'left',self.left_files[index]))
         data=data[:540,:960,:]
         left=data[...,0:3]/255

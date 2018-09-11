@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-10 22:19:02
+# @Last Modified time: 2018-09-11 11:28:42
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -367,8 +367,9 @@ class rstereo(nn.Module):
                   index1=index1[torch.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/2),pixels/25]).astype(np.int),)).long(),:]
                 if index2.shape[0]>0: 
                   #index2=index2[torch.randint(low=0,high=index2.shape[0],size=(np.ceil(index2.shape[0]/2).astype(np.int),)).long(),:]
-                  index2=torch.cat([index2[torch.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/4),pixels/25]).astype(np.int),)).long(),:], \
-                       index_r[torch.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/36),pixels/36]).astype(np.int),)).long(),:]],0)
+                  index2=index2[torch.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/4),pixels/25]).astype(np.int),)).long(),:]
+                if index_r.shape[0]>0:       
+                  index2=torch.cat([index2,index_r[torch.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/36),pixels/36]).astype(np.int),)).long(),:]],0)
                 max_d=pre2[0,1,i].long()
                 min_d=pre2[0,0,i].long()
                 max_d=200
