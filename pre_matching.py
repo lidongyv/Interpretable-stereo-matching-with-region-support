@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-11 15:48:12
+# @Last Modified time: 2018-09-12 09:45:25
 import numpy as np
 import os
 import time
@@ -127,14 +127,14 @@ left_files.sort()
 length=len(left_files)
 start=[]
 end=[]
-# p = Pool(thread_num)
-# for z in range(thread_num):
-#     start.append(z*length/10)
-#     end.append((z+1)*length/10)
-# for z in range(thread_num):
-#     p.apply_async(pre_matching, args=(start[z],end[z]))
+p = Pool(thread_num)
+for z in range(thread_num):
+    start.append(z*length/10)
+    end.append((z+1)*length/10)
+for z in range(thread_num):
+    p.apply_async(pre_matching, args=(start[z],end[z]))
 
-# p.close()
-# p.join()
-pre_matching(0,1)
+p.close()
+p.join()
+#pre_matching(0,1)
 print('end')
