@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-03-19 13:33:07
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-12 13:00:20
+# @Last Modified time: 2018-09-13 11:39:51
 
 import os
 import torch
@@ -29,8 +29,8 @@ class SceneFlow(data.Dataset):
                    'std': [0.229, 0.224, 0.225]}
         self.left_files = {}
         self.datapath=root
-        self.left_files=os.listdir(os.path.join(self.datapath,'left'))
-        self.match_files=os.listdir(os.path.join(self.datapath,'match'))
+        self.left_files=os.listdir(os.path.join(self.datapath,'left_re'))
+        self.match_files=os.listdir(os.path.join(self.datapath,'match_re'))
         self.left_files.sort()
 
         self.task='generation'
@@ -48,8 +48,9 @@ class SceneFlow(data.Dataset):
 
         :param index:
         """
-        index=1532
+        #index=1532
         data=np.load(os.path.join(self.datapath,'left_re',self.left_files[index]))
+        print(os.path.join(self.datapath,'left_re',self.left_files[index]))
         data=data[:540,:960,:]
         left=data[...,0:3]/255
         #print(data.shape)

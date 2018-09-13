@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-12 10:20:42
+# @Last Modified time: 2018-09-13 11:39:38
 import sys
 import torch
 import visdom
@@ -41,7 +41,7 @@ def train(args):
 
     n_classes = t_loader.n_classes
     trainloader = data.DataLoader(
-        t_loader, batch_size=args.batch_size, num_workers=0, shuffle=False)
+        t_loader, batch_size=args.batch_size, num_workers=0, shuffle=True)
     valloader = data.DataLoader(
         v_loader, batch_size=args.batch_size, num_workers=0)
 
@@ -138,7 +138,7 @@ def train(args):
             optimizer.step()
 
             print(time.time()-start_time)
-            #torch.cuda.empty_cache()
+            torch.cuda.empty_cache()
 
             # if args.visdom:
             #     vis.line(
@@ -168,7 +168,7 @@ def train(args):
             #     )
             
             loss_rec.append(loss.item())
-            print("data [%d/4400/%d/%d] Loss: %.4f" % (i, epoch, args.n_epoch,loss.item()))
+            print("data [%d/3588/%d/%d] Loss: %.4f" % (i, epoch, args.n_epoch,loss.item()))
 
             # if i>2:
             #     if loss_rec[-1]-loss_rec[-2]>5:

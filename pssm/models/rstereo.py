@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-12 15:34:52
+# @Last Modified time: 2018-09-13 11:41:00
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -349,11 +349,11 @@ class rstereo(nn.Module):
         r_sf=r_sf.cuda(1)
         l_sf=l_sf.cuda(1)
 
-        count=zero
+        count=0
         #start_time=time.time()
         #with torch.no_grad():
 
-        for i in range(torch.max(P3).type(torch.int32)):
+        for i in range(1,torch.max(P3).type(torch.int32)+1):
             with torch.no_grad():
                 x1,y1,x2,y2,size=pre[0,i].long()
                 region=P3[x1:x2,y1:y2]
@@ -367,17 +367,40 @@ class rstereo(nn.Module):
                 index_r=region.nonzero()
                 index1=object1.nonzero()
                 index2=object2.nonzero()
-                # print(index1.shape[0],index2.shape[0],index_r.shape)
-                if index1.shape[0]>0:
-                  index1=index1[np.random.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/2),pixels/40]).astype(np.int),)),:]
-                if index2.shape[0]>0: 
-                  index2=index2[np.random.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/4),pixels/40]).astype(np.int),)),:]
-                if index_r.shape[0]>0:       
-                  index2=torch.cat([index2,index_r[np.random.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/40),pixels/40]).astype(np.int),)),:]],0)
                 max_d=pre2[0,1,i].long()
                 min_d=pre2[0,0,i].long()
-                # max_d=200
-                # min_d=0          
+                #print(y2,y1)
+                #print(index1.shape[0],index2.shape[0],pixels)
+                if index1.shape[0]>0:
+                  if y2-y1 >700:
+                    index1=index1[np.random.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/30),pixels/96]).astype(np.int),)),:]
+                  elif index1.shape[0]>6000:
+                    index1=index1[np.random.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/6),pixels/36]).astype(np.int),)),:]
+                  elif index1.shape[0]/pixels<0.1:
+                    index1=index1[np.random.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/2),pixels/20]).astype(np.int),)),:]
+                  elif index1.shape[0]/pixels<0.5:
+                    index1=index1[np.random.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/3),pixels/20]).astype(np.int),)),:]
+                  else:
+                    index1=index1[np.random.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/4),pixels/20]).astype(np.int),)),:]
+                if index2.shape[0]>0:
+                  if y2-y1 >700:
+                    index2=index2[np.random.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]),pixels/96]).astype(np.int),)),:]
+                  elif index2.shape[0]>6000:
+                    index2=index2[np.random.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/6),pixels/36]).astype(np.int),)),:]
+                  elif index2.shape[0]/pixels<0.1:
+                    index2=index2[np.random.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/2),pixels/20]).astype(np.int),)),:]
+                  elif index2.shape[0]/pixels<0.5:
+                    index2=index2[np.random.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/3),pixels/20]).astype(np.int),)),:]
+                  else:
+                    index2=index2[np.random.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/4),pixels/25]).astype(np.int),)),:]
+                if index_r.shape[0]>0:
+                  if y2-y1>700:
+                    index2=torch.cat([index2,index_r[np.random.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/96),pixels/96]).astype(np.int),)),:]],0)
+                  elif index_r.shape[0]>6000:
+                    index2=torch.cat([index2,index_r[np.random.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/48),pixels/48]).astype(np.int),)),:]],0)
+                  else:
+                    index2=torch.cat([index2,index_r[np.random.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/25),pixels/25]).astype(np.int),)),:]],0)
+                #print(index1.shape[0],index2.shape[0],pixels)      
                 #print(max_d.item(),min_d.item())     
                 d=torch.arange(min_d,max_d+1).cuda(1)
                 if index1.shape[0]>0:
@@ -403,19 +426,19 @@ class rstereo(nn.Module):
                 s_cost=torch.where(s_r_y>=0,-s_cost,40*one)
                 disparity[x1:x2,y1:y2][index1[:,0],index1[:,1]]=self.ss_argmin(s_cost.view(1,index1.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
                 
-            # if index2.shape[0]>0:
-            #     l_feature=l_lf[...,x1:x2,y1:y2][...,index2[:,0],index2[:,1]].unsqueeze(-1).contiguous() \
-            #               .expand(l_lf.shape[0],l_lf.shape[1],index2.shape[0],d.shape[0]).contiguous() \
-            #               .view(l_lf.shape[0],l_lf.shape[1],d.shape[0]*index2.shape[0])
-            #     l_r_y=torch.max(index2_d_y+y1-d_index2,-torch.ones_like(index2_d_y))
-            #     l_r_o_t=r_lf[...,index2_d_x+x1,l_r_y]
-            #     l_cost=self.similarity1((torch.where(l_r_y>=0,l_feature-l_r_o_t,2*l_feature)).unsqueeze(-1)) \
-            #           +self.similarity2((torch.where(l_r_y>=0,l_feature*l_r_o_t,zero)).unsqueeze(-1))
-            #     l_cost=l_cost.squeeze()
-            #     l_cost=torch.where(l_r_y>=0,-l_cost,40*one)
-            #     disparity[x1:x2,y1:y2][index2[:,0],index2[:,1]]=self.ss_argmin(l_cost.view(1,index2.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
+            if index2.shape[0]>0:
+                l_feature=l_lf[...,x1:x2,y1:y2][...,index2[:,0],index2[:,1]].unsqueeze(-1).contiguous() \
+                          .expand(l_lf.shape[0],l_lf.shape[1],index2.shape[0],d.shape[0]).contiguous() \
+                          .view(l_lf.shape[0],l_lf.shape[1],d.shape[0]*index2.shape[0])
+                l_r_y=torch.max(index2_d_y+y1-d_index2,-torch.ones_like(index2_d_y))
+                l_r_o_t=r_lf[...,index2_d_x+x1,l_r_y]
+                l_cost=self.similarity1((torch.where(l_r_y>=0,l_feature-l_r_o_t,2*l_feature)).unsqueeze(-1)) \
+                      +self.similarity2((torch.where(l_r_y>=0,l_feature*l_r_o_t,zero)).unsqueeze(-1))
+                l_cost=l_cost.squeeze()
+                l_cost=torch.where(l_r_y>=0,-l_cost,40*one)
+                disparity[x1:x2,y1:y2][index2[:,0],index2[:,1]]=self.ss_argmin(l_cost.view(1,index2.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
             #print(min_d.item(),max_d.item(),torch.max(disparity).item())
-        #print(count,count/960/540)
+        print(count/960/540)
         #time.sleep(1000)
         #exit()
         return disparity
