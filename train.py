@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-13 11:39:38
+# @Last Modified time: 2018-09-15 17:36:02
 import sys
 import torch
 import visdom
@@ -41,7 +41,7 @@ def train(args):
 
     n_classes = t_loader.n_classes
     trainloader = data.DataLoader(
-        t_loader, batch_size=args.batch_size, num_workers=0, shuffle=True)
+        t_loader, batch_size=args.batch_size, num_workers=0, shuffle=False)
     valloader = data.DataLoader(
         v_loader, batch_size=args.batch_size, num_workers=0)
 
@@ -49,7 +49,28 @@ def train(args):
     running_metrics = runningScore(n_classes)
 
     # Setup visdom for visualization
-
+    if args.visdom:
+        vis = visdom.Visdom()
+        # old_window = vis.line(X=torch.zeros((1,)).cpu(),
+        #                        Y=torch.zeros((1)).cpu(),
+        #                        opts=dict(xlabel='minibatches',
+        #                                  ylabel='Loss',
+        #                                  title='Trained Loss',
+        #                                  legend=['Loss']))
+        loss_window = vis.line(X=torch.zeros((1,)).cpu(),
+                               Y=torch.zeros((1)).cpu(),
+                               opts=dict(xlabel='minibatches',
+                                         ylabel='Loss',
+                                         title='Training Loss',
+                                         legend=['Loss']))
+        # pre_window = vis.image(
+        #     np.random.rand(480, 640),
+        #     opts=dict(title='predict!', caption='predict.'),
+        # )
+        # ground_window = vis.image(
+        #     np.random.rand(480, 640),
+        #     opts=dict(title='ground!', caption='ground.'),
+        # )
     # Setup Model
     model = get_model(args.arch)
     # parameters=model.named_parameters()
@@ -85,16 +106,20 @@ def train(args):
             #opt=None
             print("Loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
-            time.sleep(2)
+            trained=checkpoint['epoch']
+            #trained=0
             
     else:
         print("No checkpoint found at '{}'".format(args.resume))
         print('Initialize from resnet34!')
-
+        resnet34=torch.load(args.resume)
+        model_dict=model.state_dict()            
+        pre_dict={k: v for k, v in resnet34.items() if k in model_dict}
+        model_dict.update(pre_dict)
+        model.load_state_dict(model_dict)
         print('load success!')
         best_error=1
         trained=0
-        time.sleep(2)
 
 
     #best_error=5
@@ -140,12 +165,12 @@ def train(args):
             print(time.time()-start_time)
             torch.cuda.empty_cache()
 
-            # if args.visdom:
-            #     vis.line(
-            #         X=torch.ones(1).cpu() * i+torch.ones(1).cpu() *(epoch-trained)*816,
-            #         Y=loss.item()*torch.ones(1).cpu(),
-            #         win=loss_window,
-            #         update='append')
+            if args.visdom:
+                vis.line(
+                    X=torch.ones(1).cpu() * i+torch.ones(1).cpu() *(epoch-trained)*3588,
+                    Y=loss.item()*torch.ones(1).cpu(),
+                    win=loss_window,
+                    update='append')
             #     pre = outputs.data.cpu().numpy().astype('float32')
             #     pre = pre[0, :, :, :]
             #     #pre = np.argmax(pre, 0)
@@ -207,7 +232,7 @@ if __name__ == '__main__':
                         help='Learning Rate')
     parser.add_argument('--feature_scale', nargs='?', type=int, default=1,
                         help='Divider for # of features to use')
-    parser.add_argument('--resume', nargs='?', type=str, default=None,
+    parser.add_argument('--resume', nargs='?', type=str, default='/home/lidong/Documents/PSSM/6_rstereo_sceneflow_best_model.pkl',
                         help='Path to previous saved model to restart from /home/lidong/Documents/PSSM/rstereo_sceneflow_best_model.pkl')
     parser.add_argument('--visdom', nargs='?', type=bool, default=True,
                         help='Show visualization(s) on visdom | False by  default')

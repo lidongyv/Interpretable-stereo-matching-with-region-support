@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-03-19 13:33:07
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-13 11:39:51
+# @Last Modified time: 2018-09-15 11:46:42
 
 import os
 import torch
@@ -29,11 +29,15 @@ class SceneFlow(data.Dataset):
                    'std': [0.229, 0.224, 0.225]}
         self.left_files = {}
         self.datapath=root
-        self.left_files=os.listdir(os.path.join(self.datapath,'left_re'))
-        self.match_files=os.listdir(os.path.join(self.datapath,'match_re'))
-        self.left_files.sort()
-
+        if split=='train':
+            self.left_files=os.listdir(os.path.join(self.datapath,'left_re'))
+            self.match_files=os.listdir(os.path.join(self.datapath,'match_re'))
+            self.left_files.sort()
+        else:
+            self.left_files=os.listdir(os.path.join(self.datapath,'test','left'))
+            self.left_files.sort()            
         self.task='generation'
+        self.split=split
         if len(self.left_files)<1:
             raise Exception("No files for ld=[%s] found in %s" % (split, self.ld))
 
@@ -49,17 +53,28 @@ class SceneFlow(data.Dataset):
         :param index:
         """
         #index=1532
-        data=np.load(os.path.join(self.datapath,'left_re',self.left_files[index]))
-        print(os.path.join(self.datapath,'left_re',self.left_files[index]))
-        data=data[:540,:960,:]
-        left=data[...,0:3]/255
-        #print(data.shape)
-        right=data[...,3:6]/255
-        disparity=data[...,6]
-        P=data[...,7:]
-        pre_match=np.load(os.path.join(self.datapath,'match_re',self.left_files[index]))
-        matching=np.load(os.path.join(self.datapath,'matching',self.left_files[index]))
-        aggregation=np.load(os.path.join(self.datapath,'aggregation',self.left_files[index]))
+        if self.split=='test':
+            data=np.load(os.path.join(self.datapath,self.split,'left',self.left_files[index]))
+            print(os.path.join(self.datapath,self.split,'left',self.left_files[index]))
+            data=data[:540,:960,:]
+            left=data[...,0:3]/255
+            #print(data.shape)
+            right=data[...,3:6]/255
+            disparity=data[...,6]
+            P=data[...,7:]
+            pre_match=np.load(os.path.join(self.datapath,self.split,'match',self.left_files[index]))
+        else:
+            data=np.load(os.path.join(self.datapath,'left_re',self.left_files[index]))
+            print(os.path.join(self.datapath,'left_re',self.left_files[index]))
+            data=data[:540,:960,:]
+            left=data[...,0:3]/255
+            #print(data.shape)
+            right=data[...,3:6]/255
+            disparity=data[...,6]
+            P=data[...,7:]
+            pre_match=np.load(os.path.join(self.datapath,'match_re',self.left_files[index]))
+        #matching=np.load(os.path.join(self.datapath,'matching',self.left_files[index]))
+        # aggregation=np.load(os.path.join(self.datapath,'aggregation',self.left_files[index]))
         #print('load')
         if self.is_transform:
             left, right,disparity,P,pre_match,pre2 = self.transform(left, right,disparity,P,pre_match)

@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-13 11:41:00
+# @Last Modified time: 2018-09-15 16:57:27
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -28,7 +28,7 @@ rsn_specs = {
 
 }
 
-group_dim=4
+group_dim=32
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
