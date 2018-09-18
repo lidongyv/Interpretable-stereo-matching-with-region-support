@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-15 16:57:27
+# @Last Modified time: 2018-09-17 18:37:11
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -29,7 +29,7 @@ rsn_specs = {
 }
 
 group_dim=32
-
+pramid_dim=8
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
 
@@ -78,30 +78,30 @@ class feature_extraction(nn.Module):
 
         self.branch1 = nn.Sequential(nn.AvgPool2d((54, 96), stride=(54,96)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
-                                     nn.GroupNorm(4,8),
+                                     nn.GroupNorm(pramid_dim,8),
                                      nn.LeakyReLU(inplace=True))
 
         self.branch2 = nn.Sequential(nn.AvgPool2d((27, 48), stride=(27,48)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
-                                     nn.GroupNorm(4,8),
+                                     nn.GroupNorm(pramid_dim,8),
                                      nn.LeakyReLU(inplace=True))
 
         self.branch3 = nn.Sequential(nn.AvgPool2d((36, 64), stride=(36,64)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
-                                     nn.GroupNorm(4,8),
+                                     nn.GroupNorm(pramid_dim,8),
                                      nn.LeakyReLU(inplace=True))
 
         self.branch4 = nn.Sequential(nn.AvgPool2d((18, 32), stride=(18,32)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
-                                     nn.GroupNorm(4,8),
+                                     nn.GroupNorm(pramid_dim,8),
                                      nn.LeakyReLU(inplace=True))
         self.branch5 = nn.Sequential(nn.AvgPool2d((9, 16), stride=(9,16)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
-                                     nn.GroupNorm(4,8),
+                                     nn.GroupNorm(pramid_dim,8),
                                      nn.LeakyReLU(inplace=True))
         self.branch6 = nn.Sequential(nn.AvgPool2d((3, 8), stride=(3,8)),
                                      nn.Conv2d(32, 8, 1, 1, 0, 1),
-                                     nn.GroupNorm(4,8),
+                                     nn.GroupNorm(pramid_dim,8),
                                      nn.LeakyReLU(inplace=True))
 
 
@@ -369,6 +369,8 @@ class rstereo(nn.Module):
                 index2=object2.nonzero()
                 max_d=pre2[0,1,i].long()
                 min_d=pre2[0,0,i].long()
+                # max_d=300
+                # min_d=0
                 #print(y2,y1)
                 #print(index1.shape[0],index2.shape[0],pixels)
                 if index1.shape[0]>0:

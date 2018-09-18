@@ -104,6 +104,7 @@ p_right_image=[]
 p_disparity=[]
 p_semantic=[]
 output_dir=r'/home/lidong/Documents/datasets/Driving/train_data/'
+
 path=pathd
 for p in range(len(path)):
     file=os.listdir(path[p])
