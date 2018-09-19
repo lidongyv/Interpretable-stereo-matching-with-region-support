@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-14 23:04:50
+# @Last Modified time: 2018-09-19 12:00:25
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -377,37 +377,49 @@ class rstereo(nn.Module):
         for i in range(torch.max(P3).type(torch.int32)):
             with torch.no_grad():
                 x1,y1,x2,y2,size=pre[0,i].long()
+                max_d=pre2[0,1,i].long()
+                min_d=pre2[0,0,i].long()
+                d=torch.arange(min_d,max_d+1).cuda(1)
+                cost_volume=torch.zeros(x2-x1,y2-y1,max_d-min_d+1).cuda(1)
                 region=P3[x1:x2,y1:y2]
                 P1_r=P1[x1:x2,y1:y2]
                 P2_r=P2[x1:x2,y1:y2]
                 region=torch.where(region==i,one,zero)
+                plane=P4[x1:x2,y1:y2]*region
                 pixels=torch.sum(region).item()
                 object1=region*P1_r
                 object2=region*P2_r
                 region=region-object1-object2
-                index_r=region.nonzero()
-                index1=object1.nonzero()
-                index2=object2.nonzero()
+                # index_r=region.nonzero()
+                # index1=object1.nonzero()
+                # index2=object2.nonzero()
+                index1=[]
+                index2=[]
+                for j in range(1,torch.max(P4).type(torch.int32)):
+                    plane_j=torch.where(plane==j,one,zero)
+                    num_j=torch.sum(plane_j)
+                    index1_j=(plane_j*P1_r).nonzero()
+                    index2_j=(plane_j*P2_r).nonzero()
+                    indexr_j=(plane_j-plane_j*P1_r-plane_j*P2_r).nonzero()
+                    if index1_j.shape[0]/num_j<0.04:
+                        index1.append(index1_j)
+                    elif index1_j.shape[0]/num_j<0.15:
+                        index1.append(index1_j[np.random.randint(low=0,high=index1_j.shape[0],size=(np.min([np.ceil(index1_j.shape[0]/3),num_j/10]).astype(np.int),)),:])
+
                 if index1.shape[0]>0:
                   index1=index1[np.random.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/2),pixels/25]).astype(np.int),)),:]
-                if index2.shape[0]>0: 
-                  #index2=index2[np.random.randint(low=0,high=index2.shape[0],size=(np.ceil(index2.shape[0]/2).astype(np.int),)).long(),:]
-                  index2=index2[np.random.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/4),pixels/25]).astype(np.int),)),:]
-                if index_r.shape[0]>0:       
-                  index2=torch.cat([index2,index_r[np.random.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/36),pixels/36]).astype(np.int),)),:]],0)
-                region=torch.where(region==i,one,zero)
-                index_r=region.nonzero()
-                max_d=pre2[0,1,i].long()
-                min_d=pre2[0,0,i].long()
-                # max_d=200
-                # min_d=0          
-                #print(max_d.item(),min_d.item())     
-                d=torch.arange(min_d,max_d+1).cuda(1)
-                cost_volume=torch.zeros(x2-x1,y2-y1,max_d-min_d+1)
                 if index1.shape[0]>0:
                   d_index1=d.expand(index1.shape[0],max_d- min_d+1).contiguous().view(-1)
                   index1_d_x=index1[:,0].unsqueeze(-1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
                   index1_d_y=index1[:,1].unsqueeze(-1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
+
+                if index2.shape[0]>0: 
+                  index2=index2[np.random.randint(low=0,high=index2.shape[0],size=(np.min([np.ceil(index2.shape[0]/4),pixels/25]).astype(np.int),)),:]
+                if index_r.shape[0]>0:       
+                  index2=torch.cat([index2,index_r[np.random.randint(low=0,high=index_r.shape[0],size=(np.min([np.ceil(index_r.shape[0]/36),pixels/36]).astype(np.int),)),:]],0)
+                region=P3[x1:x2,y1:y2]
+                region=torch.where(region==i,one,zero)
+                index_r=region.nonzero()
                 if index2.shape[0]>0:
                   d_index2=d.expand(index2.shape[0],max_d-min_d+1).contiguous().view(-1)
                   index2_d_x=index2[:,0].view(index2.shape[0],1).expand(index2.shape[0],d.shape[0]).contiguous().view(-1)
