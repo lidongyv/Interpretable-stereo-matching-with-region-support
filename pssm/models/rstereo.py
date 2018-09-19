@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-17 18:37:11
+# @Last Modified time: 2018-09-19 12:08:54
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -439,7 +439,7 @@ class rstereo(nn.Module):
                 l_cost=l_cost.squeeze()
                 l_cost=torch.where(l_r_y>=0,-l_cost,40*one)
                 disparity[x1:x2,y1:y2][index2[:,0],index2[:,1]]=self.ss_argmin(l_cost.view(1,index2.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
-            #print(min_d.item(),max_d.item(),torch.max(disparity).item())
+            
         print(count/960/540)
         #time.sleep(1000)
         #exit()
