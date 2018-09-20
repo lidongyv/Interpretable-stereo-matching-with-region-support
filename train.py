@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 13:41:34
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-17 18:37:36
+# @Last Modified time: 2018-09-20 19:56:37
 import sys
 import torch
 import visdom
@@ -112,13 +112,12 @@ def train(args):
     else:
         print("No checkpoint found at '{}'".format(args.resume))
         print('Initialize from resnet34!')
-        resnet34=torch.load(args.resume)
+        resnet34=torch.load('/home/lidong/Documents/PSSM/33_rstereo_sceneflow_best_model.pkl')
         model_dict=model.state_dict()            
         pre_dict={k: v for k, v in resnet34.items() if k in model_dict}
         model_dict.update(pre_dict)
         model.load_state_dict(model_dict)
         print('load success!')
-        best_error=1
         trained=0
 
 
@@ -158,6 +157,7 @@ def train(args):
                 # for name,param in parameters:
                 #     print(name)
                 #     print(param.grad)
+                print("nan error")
                 exit()
             #parameters=model.named_parameters()
             optimizer.step()
@@ -232,7 +232,7 @@ if __name__ == '__main__':
                         help='Learning Rate')
     parser.add_argument('--feature_scale', nargs='?', type=int, default=1,
                         help='Divider for # of features to use')
-    parser.add_argument('--resume', nargs='?', type=str, default='/home/lidong/Documents/PSSM/26_rstereo_sceneflow_best_model.pkl',
+    parser.add_argument('--resume', nargs='?', type=str, default='/home/lidong/Documents/PSSM/8_rstereo_sceneflow_best_model.pkl',
                         help='Path to previous saved model to restart from /home/lidong/Documents/PSSM/rstereo_sceneflow_best_model.pkl')
     parser.add_argument('--visdom', nargs='?', type=bool, default=True,
                         help='Show visualization(s) on visdom | False by  default')

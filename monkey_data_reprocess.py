@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-19 10:23:41
+# @Last Modified time: 2018-09-19 22:32:22
 import numpy as np
 import os
 import time
@@ -20,7 +20,7 @@ from skimage.filters import roberts, sobel, scharr, prewitt
 #from skimage.feature import hog
 from skimage import exposure
 import time
-thread_num=8
+thread_num=1
 
 def pre_processing(start,end):
     # output_dir=r'/home/dataset2/flying3d/train/left'
@@ -114,12 +114,19 @@ def pre_processing(start,end):
     output_dir=r'/home/dataset2/flying3d/train/right/'
     P_dir=r'/home/lidong/Documents/datasets/monkey/train/right/'
     P_files=os.listdir(P_dir)
-    P_files.sort()    
+    P_files.sort()
+    print(start,end,len(P_files))
+    #exit()
     for f in range(int(start),int(end)):
-        if os.path.isfile(os.path.join(output_dir,str(f)+'.npy')):
-            print(os.path.join(output_dir,str(f)+'.npy'))
+        
+        f=2919
+
+        if os.path.isfile(os.path.join(output_dir,P_files[f])):
+            print(os.path.join(output_dir,P_files[f]))
             continue
+        print(os.path.join(P_dir,P_files[f]))
         P=np.load(os.path.join(P_dir,P_files[f]))
+
         labels=[]
         start_time=time.time()
         l_image=P[...,0:3]

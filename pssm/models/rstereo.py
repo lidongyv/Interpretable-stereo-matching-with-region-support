@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-19 12:08:54
+# @Last Modified time: 2018-09-19 22:47:19
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -268,9 +268,7 @@ class similarity_measure2(nn.Module):
         for m in self.modules():
           if isinstance(m,nn.Conv2d):
             nn.init.kaiming_normal_(m.weight,mode='fan_out',nonlinearity='relu')
-          elif isinstance(m, nn.GroupNorm):
-            nn.init.constant_(m.weight,1)
-            nn.init.constant_(m.bias,0)
+
     def forward(self, x):
         output = self.conv1(x)
         output = self.relu1(output)
@@ -282,7 +280,54 @@ class similarity_measure2(nn.Module):
         output=self.s2*output
         return output
 
+class similarity_measure3(nn.Module):
+    def __init__(self):
+        super(similarity_measure3, self).__init__()
+        self.inplanes = 32
+        self.conv1 = nn.Conv2d(69, 32, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        self.relu1 = nn.LeakyReLU(inplace=True)
+        self.conv2 = nn.Conv2d(32, 16, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        self.relu2 = nn.LeakyReLU(inplace=True)
+        self.conv3 = nn.Conv2d(16, 8, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        self.relu3 = nn.LeakyReLU(inplace=True)
+        self.conv4 = nn.Conv2d(8, 4, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        self.relu4 = nn.LeakyReLU(inplace=True)
+        self.conv5 = nn.Conv2d(4, 1, kernel_size=1, stride=1, padding=0,
+                               bias=False,dilation=1)
+        # self.relu5 = nn.ReLU(inplace=True)
 
+
+        for m in self.modules():
+          if isinstance(m,nn.Conv2d):
+            nn.init.kaiming_normal_(m.weight,mode='fan_out',nonlinearity='relu')
+          elif isinstance(m, nn.GroupNorm):
+            nn.init.constant_(m.weight,1)
+            nn.init.constant_(m.bias,0)
+    def forward(self, x):
+        output = self.conv1(x)
+        output = self.relu1(output)
+        output = self.conv2(output)
+        output = self.relu2(output)
+        output = self.conv3(output)
+        output = self.relu3(output)
+        output = self.conv4(output)
+        output = self.relu4(output)
+        output = self.conv5(output)
+        output = torch.abs(output)
+        # output = self.relu5(output)
+        # print(output.shape)
+        # print(torch.mean(output).item(),torch.max(output).item(),torch.min(output).item())
+
+        output = output/torch.max(output)
+        # output = output-torch.min(output)
+        # output = 1-output
+        output = torch.exp(-output)
+        #print(torch.mean(output).item(),torch.max(output).item(),torch.min(output).item())
+        return output
 class rstereo(nn.Module):
 
 
@@ -298,7 +343,7 @@ class rstereo(nn.Module):
         self.softmax= nn.Softmax(dim=-1)
         self.similarity1=similarity_measure1().cuda(1)
         self.similarity2=similarity_measure2().cuda(1)
-
+        self.similarity3=similarity_measure3().cuda(1)
 
     def ss_argmin(self,x,index):
         one=torch.ones(1)
@@ -423,11 +468,29 @@ class rstereo(nn.Module):
                 s_r_o_t=r_sf[...,index1_d_x+x1,s_r_y]
                 s_cost=self.similarity1((torch.where(s_r_y>=0,s_feature-s_r_o_t,zero)).unsqueeze(-1)) \
                       +self.similarity2((torch.where(s_r_y>=0,s_feature*s_r_o_t,zero)).unsqueeze(-1))
+                s_cost=s_cost.view(s_cost.shape[0],index1.shape[0],d.shape[0])
+                a_s_feature=torch.cat([l_sf[...,x1:x2,y1:y2][...,index1[:,0],index1[:,1]],index1[:,0].unsqueeze(0).unsqueeze(0).float(),index1[:,1].unsqueeze(0).unsqueeze(0).float()],1)
+                s_mean_feature=torch.mean(a_s_feature,2,keepdim=True).expand(a_s_feature.shape[0],a_s_feature.shape[1],index1.shape[0])
+                #print(torch.norm(a_s_feature-s_mean_feature,dim=1).shape)
+                s_weights=self.similarity3(torch.cat([a_s_feature,s_mean_feature,torch.norm(a_s_feature-s_mean_feature,dim=1).unsqueeze(1)],dim=1).unsqueeze(-1)).squeeze()
+                #s_weights_b=s_weights.unsqueeze(0).expand(d.shape[0],-1).contiguous().view(s_cost.shape[0],s_cost.shape[1],s_cost.shape[2])
+                #s_weights=torch.where(index1[:,1]>=0,s_weights,zero)
+                s_weights=s_weights.unsqueeze(0).expand(d.shape[0],-1).contiguous().view(s_cost.shape[0],s_cost.shape[1],s_cost.shape[2])
+                s_weights_b=s_weights
+                s_weights=torch.where(s_r_y.view_as(s_cost)>=0,s_weights,1e-4*one)
+                #print(s_cost.shape) 1,n,d
+                #print(s_cost.shape)
+                mean_cost=torch.sum((s_weights*s_cost),1)/torch.sum(s_weights,1)
+                mean_cost=torch.where(torch.sum(s_weights,1)==zero,torch.sum((s_weights*s_cost),1),mean_cost)
+                #print(torch.mean(torch.sum((s_weights*s_cost),1)).item(),torch.min(torch.sum(s_weights,1)).item(),torch.mean(mean_cost).item())
+                #r_mean_cost=r_mean_cost+mean_cost*index1.shape[0]
+                mean_cost=mean_cost.unsqueeze(1).expand(s_cost.shape[0],s_cost.shape[1],s_cost.shape[2])
 
-                s_cost=s_cost.squeeze()
-                s_cost=torch.where(s_r_y>=0,-s_cost,40*one)
-                disparity[x1:x2,y1:y2][index1[:,0],index1[:,1]]=self.ss_argmin(s_cost.view(1,index1.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
-                
+                s_cost=torch.where(s_weights>1e-4*one,mean_cost*s_weights+(one-s_weights)*s_cost,s_weights_b*mean_cost)
+                #s_cost=s_cost.squeeze()
+                #s_cost=torch.where(s_r_y>=0,-s_cost,40*one)
+                disparity[x1:x2,y1:y2][index1[:,0],index1[:,1]]=self.ss_argmin(-s_cost.view(1,index1.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
+                #print(torch.max(s_weights).item(),torch.max(s_cost).item(),torch.max(mean_cost).item())
             if index2.shape[0]>0:
                 l_feature=l_lf[...,x1:x2,y1:y2][...,index2[:,0],index2[:,1]].unsqueeze(-1).contiguous() \
                           .expand(l_lf.shape[0],l_lf.shape[1],index2.shape[0],d.shape[0]).contiguous() \
@@ -436,13 +499,36 @@ class rstereo(nn.Module):
                 l_r_o_t=r_lf[...,index2_d_x+x1,l_r_y]
                 l_cost=self.similarity1((torch.where(l_r_y>=0,l_feature-l_r_o_t,2*l_feature)).unsqueeze(-1)) \
                       +self.similarity2((torch.where(l_r_y>=0,l_feature*l_r_o_t,zero)).unsqueeze(-1))
-                l_cost=l_cost.squeeze()
-                l_cost=torch.where(l_r_y>=0,-l_cost,40*one)
-                disparity[x1:x2,y1:y2][index2[:,0],index2[:,1]]=self.ss_argmin(l_cost.view(1,index2.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
-            
+                l_cost=l_cost.view(l_cost.shape[0],index2.shape[0],d.shape[0])
+                a_l_feature=torch.cat([l_sf[...,x1:x2,y1:y2][...,index2[:,0],index2[:,1]],index2[:,0].unsqueeze(0).unsqueeze(0).float(),index2[:,1].unsqueeze(0).unsqueeze(0).float()],1)
+                l_mean_feature=torch.mean(a_l_feature,2,keepdim=True).expand(a_l_feature.shape[0],a_l_feature.shape[1],index2.shape[0])
+                #print(torch.norm(a_l_feature-l_mean_feature,dim=1).shape)
+                l_weights=self.similarity3(torch.cat([a_l_feature,l_mean_feature,torch.norm(a_l_feature-l_mean_feature,dim=1).unsqueeze(1)],dim=1).unsqueeze(-1)).squeeze()
+                l_weights=l_weights.unsqueeze(0).expand(d.shape[0],-1).contiguous().view(l_cost.shape[0],l_cost.shape[1],l_cost.shape[2])
+                l_weight_b=l_weights
+                l_weights=torch.where(l_r_y.view_as(l_cost)>=0,l_weights,one*1e-4)
+                #print(l_cost.shape) 1,n,d
+                mean_cost=torch.sum((l_weights*l_cost),1)/torch.sum(l_weights,1)
+                mean_cost=torch.where(torch.sum(l_weights,1)==zero,torch.sum((l_weights*l_cost),1),mean_cost)
+                #r_mean_cost=r_mean_cost+mean_cost*index2.shape[0]
+                mean_cost=mean_cost.unsqueeze(1).expand(l_cost.shape[0],l_cost.shape[1],l_cost.shape[2])
+                
+                l_cost=torch.where(l_weights>one*1e-4*one,mean_cost*l_weights+(one-l_weights)*l_cost,l_weight_b*mean_cost)
+                #l_cost=l_cost.squeeze()
+                #l_cost=torch.where(l_r_y>=0,-l_cost,40*one)
+                disparity[x1:x2,y1:y2][index2[:,0],index2[:,1]]=self.ss_argmin(-l_cost.view(1,index2.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
+                #print(torch.max(l_weights).item(),torch.max(l_cost).item(),torch.min(l_weight_b).item())
+            # if index_r.shape[0]>0:
+            #     a_feature=torch.cat([l_lf[...,x1:x2,y1:y2][...,index_r[:,0],index_r[:,1]],index_r[:,0].unsqueeze(0).unsqueeze(0),index_r[:,1].unsqueeze(0).unsqueeze(0)],1)
+            #     mean_feature=torch.mean(a_feature,2,keepdim=True).expand(index_r.shape[0])
+            #     weights=self.similarity2(torch.cat([a_feature,mean_feature,torch.norm(a_feature-mean_feature,1)],1).unsqueeze(-1)).squeeze()
+            #     weights=weights.unsqueeze(0).expand(d.shape[0],-1).view_as(cost_volume[index_r[:,0],index_r[:,1],:])
+            #     r_mean_cost=r_mean_cost/(index1.shape[0]+index2.shape[0])
+            #     cost_volume=torch.where(cost_volume==zero,weights*mean_cost,cost_volume)                        
         print(count/960/540)
         #time.sleep(1000)
         #exit()
+        print(torch.max(disparity).item(),torch.min(disparity).item())
         return disparity
 
 
