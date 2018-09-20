@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-19 12:00:25
+# @Last Modified time: 2018-09-20 22:37:49
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -405,6 +405,7 @@ class rstereo(nn.Module):
                         index1.append(index1_j)
                     elif index1_j.shape[0]/num_j<0.15:
                         index1.append(index1_j[np.random.randint(low=0,high=index1_j.shape[0],size=(np.min([np.ceil(index1_j.shape[0]/3),num_j/10]).astype(np.int),)),:])
+
 
                 if index1.shape[0]>0:
                   index1=index1[np.random.randint(low=0,high=index1.shape[0],size=(np.min([np.ceil(index1.shape[0]/2),pixels/25]).astype(np.int),)),:]
