@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-07-17 10:44:43
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-20 20:13:12
+# @Last Modified time: 2018-09-20 22:12:39
 # -*- coding: utf-8 -*-
 # @Author: lidong
 # @Date:   2018-03-20 18:01:52
@@ -457,10 +457,18 @@ class rstereo(nn.Module):
                   d_index1=d.expand(index1.shape[0],max_d-min_d+1).contiguous().view(-1)
                   index1_d_x=index1[:,0].unsqueeze(-1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
                   index1_d_y=index1[:,1].unsqueeze(-1).expand(index1.shape[0],d.shape[0]).contiguous().view(-1)
+                if index1_all.shape[0]>0:
+                  d_index1_all=d.expand(index1_all.shape[0],max_d-min_d+1).contiguous().view(-1)
+                  index1_all_d_x=index1_all[:,0].unsqueeze(-1).expand(index1_all.shape[0],d.shape[0]).contiguous().view(-1)
+                  index1_all_d_y=index1_all[:,1].unsqueeze(-1).expand(index1_all.shape[0],d.shape[0]).contiguous().view(-1)                  
                 if index2.shape[0]>0:
                   d_index2=d.expand(index2.shape[0],max_d-min_d+1).contiguous().view(-1)
                   index2_d_x=index2[:,0].view(index2.shape[0],1).expand(index2.shape[0],d.shape[0]).contiguous().view(-1)
                   index2_d_y=index2[:,1].view(index2.shape[0],1).expand(index2.shape[0],d.shape[0]).contiguous().view(-1)
+                if index2_all.shape[0]>0:
+                  d_index2_all=d.expand(index2_all.shape[0],max_d-min_d+1).contiguous().view(-1)
+                  index2_all_d_x=index2_all[:,0].view(index2_all.shape[0],1).expand(index2_all.shape[0],d.shape[0]).contiguous().view(-1)
+                  index2_all_d_y=index2_all[:,1].view(index2_all.shape[0],1).expand(index2_all.shape[0],d.shape[0]).contiguous().view(-1)
                 count=count+index2.shape[0]+index1.shape[0]
 
             if index1.shape[0]>0:
@@ -484,6 +492,23 @@ class rstereo(nn.Module):
                 mean_cost=mean_cost.unsqueeze(1).expand(s_cost.shape[0],s_cost.shape[1],s_cost.shape[2])
                 s_cost=torch.where(s_weights>1e-4*one,mean_cost*s_weights+(one-s_weights)*s_cost,s_weights_b*mean_cost)
                 disparity[x1:x2,y1:y2][index1[:,0],index1[:,1]]=self.ss_argmin(-s_cost.view(1,index1.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
+            if index1_all.shape[0]>0:
+                #completion, we need the cost volume
+                s_feature=l_sf[...,x1:x2,y1:y2][...,index1_all[:,0],index1_all[:,1]].unsqueeze(-1).contiguous() \
+                            .expand(l_sf.shape[0],l_sf.shape[1],index1_all.shape[0],d.shape[0]).contiguous() \
+                            .view(l_sf.shape[0],l_sf.shape[1],d.shape[0]*index1_all.shape[0])
+                s_r_y=torch.max(index1_all_d_y+y1-d_index1_all,-torch.ones_like(index1_all_d_y))
+                a_s_feature=torch.cat([l_sf[...,x1:x2,y1:y2][...,index1_all[:,0],index1_all[:,1]],index1_all[:,0].unsqueeze(0).unsqueeze(0).float(),index1_all[:,1].unsqueeze(0).unsqueeze(0).float()],1)
+                s_mean_feature=torch.mean(a_s_feature,2,keepdim=True).expand(a_s_feature.shape[0],a_s_feature.shape[1],index1_all.shape[0])
+                s_weights=self.similarity3(torch.cat([a_s_feature,s_mean_feature,torch.norm(a_s_feature-s_mean_feature,dim=1).unsqueeze(1)],dim=1).unsqueeze(-1)).squeeze()
+                s_weights=s_weights.unsqueeze(0).expand(d.shape[0],-1).contiguous().view(s_cost.shape[0],s_cost.shape[1],s_cost.shape[2])
+                s_weights_b=s_weights
+                s_weights=torch.where(s_r_y.view_as(s_cost)>=0,s_weights,1e-4*one)
+                mean_cost=torch.sum((s_weights*s_cost),1)/torch.sum(s_weights,1)
+                mean_cost=torch.where(torch.sum(s_weights,1)==zero,torch.sum((s_weights*s_cost),1),mean_cost)
+                mean_cost=mean_cost.unsqueeze(1).expand(s_cost.shape[0],s_cost.shape[1],s_cost.shape[2])
+                s_cost=torch.where(s_weights>1e-4*one,mean_cost*s_weights+(one-s_weights)*s_cost,s_weights_b*mean_cost)                
+                disparity[x1:x2,y1:y2][index1_all[:,0],index1_all[:,1]]=self.ss_argmin(-s_cost.view(1,index1_all.shape[0],d.shape[0]).cuda(0),d.float().cuda(0))
                 #print(torch.max(s_weights).item(),torch.max(s_cost).item(),torch.max(mean_cost).item())
             if index2.shape[0]>0:
                 l_feature=l_lf[...,x1:x2,y1:y2][...,index2[:,0],index2[:,1]].unsqueeze(-1).contiguous() \
