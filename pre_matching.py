@@ -2,14 +2,14 @@
 # @Author: yulidong
 # @Date:   2018-07-18 18:49:15
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-12 09:45:25
+# @Last Modified time: 2018-09-22 16:05:36
 import numpy as np
 import os
 import time
 import matplotlib.pyplot as plt
 from multiprocessing import Process,Lock
 from multiprocessing import Pool
-thread_num=10
+thread_num=8
 def crop(object):
     ground=np.array((object==1).nonzero())
     x1=np.min(ground[0,:])
@@ -19,19 +19,14 @@ def crop(object):
     size=np.sum(object)
     return x1,y1,x2+1,y2+1,size
 def pre_matching(start,end):
-    left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left_re/'
-    right_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/right_re/'
-    match_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/match_re/'
+    left_dir=r'/home/dataset2/flying3d/train/left_re/'
+    right_dir=r'/home/dataset2/flying3d/train/right_re/'
+    match_dir=r'/home/dataset2/flying3d/train/match/'
     left_files=os.listdir(left_dir)
     left_files.sort()
     right_files=os.listdir(right_dir)
     right_files.sort()
-    # s_index=int(np.floor(length/thread_num*index))-2
-    # e_index=int(np.floor(length/thread_num*(index+1)))+2
-    # if e_index>length:
-    #     e_index=length
-    # if s_index<0:
-    #     s_index=0
+
     for i in range(int(start),int(end)):
         left=np.load(os.path.join(left_dir,left_files[i]))[...,9]
         right=np.load(os.path.join(right_dir,right_files[i]))[...,9]
@@ -117,11 +112,11 @@ def pre_matching(start,end):
         pre2.append(np.array([min_d,max_d]))
         pre_match=np.array([pre,pre2])
         np.save(os.path.join(match_dir,left_files[i]),pre_match)
-        print('thread:%d,doing:%d,time:%.3f' % (end/440,i,time.time()-start_time))
+        print('thread:%d,doing:%d,time:%.3f' % (end/(21828/8),i,time.time()-start_time))
 
 
 process = []
-left_dir=r'/home/lidong/Documents/datasets/Driving/train_data_clean_pass/left/'
+left_dir=r'/home/dataset2/flying3d/train/left_re'
 left_files=os.listdir(left_dir)
 left_files.sort()
 length=len(left_files)
@@ -129,8 +124,8 @@ start=[]
 end=[]
 p = Pool(thread_num)
 for z in range(thread_num):
-    start.append(z*length/10)
-    end.append((z+1)*length/10)
+    start.append(z*length/8)
+    end.append((z+1)*length/8)
 for z in range(thread_num):
     p.apply_async(pre_matching, args=(start[z],end[z]))
 

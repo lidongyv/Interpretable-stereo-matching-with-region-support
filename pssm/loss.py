@@ -2,7 +2,7 @@
 # @Author: lidong
 # @Date:   2018-03-18 16:31:14
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-10 22:13:36
+# @Last Modified time: 2018-09-21 23:32:28
 
 import torch
 import numpy as np
@@ -70,10 +70,11 @@ def cross_entropy2d(input, target, weight=None, size_average=True):
     #    loss=loss/(950*540)
     return loss
 def l1(input, target,mask, weight=None, size_average=True):
-    P1=mask[...,0].cuda(0)
-    P2=mask[...,3].cuda(0)
+    # P1=mask[...,0].cuda(0)
+    # P2=mask[...,3].cuda(0)
     one,zero=torch.ones(1).cuda(0),torch.zeros(1).cuda(0)
     mask=torch.where(input>0,one,zero)
+    #print(torch.sum(mask)/(input.shape[0]*input.shape[1]))
     mask=torch.reshape(mask,(input.shape))
     target=torch.reshape(target,(input.shape))
     loss=nn.L1Loss(reduction='none')

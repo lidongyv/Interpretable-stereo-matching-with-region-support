@@ -2,7 +2,7 @@
 # @Author: yulidong
 # @Date:   2018-03-19 13:33:07
 # @Last Modified by:   yulidong
-# @Last Modified time: 2018-09-15 11:46:42
+# @Last Modified time: 2018-09-22 16:17:45
 
 import os
 import torch
@@ -52,7 +52,7 @@ class SceneFlow(data.Dataset):
 
         :param index:
         """
-        #index=1532
+        index=135
         if self.split=='test':
             data=np.load(os.path.join(self.datapath,self.split,'left',self.left_files[index]))
             print(os.path.join(self.datapath,self.split,'left',self.left_files[index]))
